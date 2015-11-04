@@ -905,9 +905,13 @@ static bool HTTPReq_JSONRPC(AcceptedConnection *conn,
         return false;
     }
 
+    string strAuth = mapHeaders["authorization"];
+    string strUserPass64 = strAuth.substr(6); boost::trim(strUserPass64);
+    string strUserPass = DecodeBase64(strUserPass64);
+
     if (!HTTPAuthorized(mapHeaders))
     {
-        LogPrintf("ThreadRPCServer incorrect password attempt from %s\n", conn->peer_address_to_string());
+        LogPrintf("ThreadRPCServer incorrect password attempt for RPC user %s @ %s\n", strUserPass.substr(0,strUserPass.find(":")), conn->peer_address_to_string());
         /* Deter brute-forcing
            If this results in a DoS the user really
            shouldn't have their RPC port exposed. */
