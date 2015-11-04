@@ -32,6 +32,7 @@ using namespace json_spirit;
 using namespace std;
 
 static std::string strRPCUserColonPass;
+static std::vector<string> vRPCAuth;
 
 static bool fRPCRunning = false;
 static bool fRPCInWarmup = true;
@@ -387,6 +388,13 @@ bool HTTPAuthorized(map<string, string>& mapHeaders)
         return false;
     string strUserPass64 = strAuth.substr(6); boost::trim(strUserPass64);
     string strUserPass = DecodeBase64(strUserPass64);
+    BOOST_FOREACH(string strRPCAuth, vRPCAuth)
+    {
+        if(TimingResistantEqual(strUserPass, strRPCAuth))
+        {
+            return true;
+        }
+    }
     return TimingResistantEqual(strUserPass, strRPCUserColonPass);
 }
 
@@ -575,7 +583,17 @@ void StartRPCThreads()
     LogPrint("rpc", "Allowing RPC connections from: %s\n", strAllowed);
 
     strRPCUserColonPass = mapArgs["-rpcuser"] + ":" + mapArgs["-rpcpassword"];
-    if (((mapArgs["-rpcpassword"] == "") ||
+    if (mapMultiArgs.count("-rpcauth"))
+    {
+        const vector<string>& vAuth = mapMultiArgs["-rpcauth"];
+	BOOST_FOREACH(string strAuth, vAuth)
+	{
+	    //string rpcuser = strAuth.substr(0,strAuth.find(":"));
+	    //string rpcpass = strAuth.substr(strAuth.find(":")+1);
+	    vRPCAuth.push_back(strAuth);
+	}    
+    }
+    else if (((mapArgs["-rpcpassword"] == "") ||
          (mapArgs["-rpcuser"] == mapArgs["-rpcpassword"])) && Params().RequireRPCPassword())
     {
         unsigned char rand_pwd[32];
