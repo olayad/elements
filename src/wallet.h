@@ -953,31 +953,31 @@ private:
             vBlindingFactors.resize(vout.size());
             vBlindingKeys.resize(vout.size());
         }
-        if (vAmountsOut[nOut] == 0) {
+        if (vAmountsOut.at(nOut) == 0) {
             std::vector<unsigned char> nonce(32, 0);
             int res = 0;
             CKey blinding_key;
             if (!res) {
                 // For unblinded outputs.
-                res = UnblindOutput(blinding_key, vout[nOut], vAmountsOut[nOut], vBlindingFactors[nOut]);
-                vBlindingKeys[nOut] = CPubKey();
+                res = UnblindOutput(blinding_key, vout[nOut], vAmountsOut.at(nOut), vBlindingFactors.at(nOut));
+                vBlindingKeys.at(nOut) = CPubKey();
             }
             if (!res && (blinding_key = pwallet->GetBlindingKey(&vout[nOut].scriptPubKey)).IsValid()) {
                 // For outputs using derived blinding.
-                res = UnblindOutput(blinding_key, vout[nOut], vAmountsOut[nOut], vBlindingFactors[nOut]);
+                res = UnblindOutput(blinding_key, vout[nOut], vAmountsOut.at(nOut), vBlindingFactors.at(nOut);
                 if (res) {
-                    vBlindingKeys[nOut] = blinding_key.GetPubKey();
+                    vBlindingKeys.at(nOut) = blinding_key.GetPubKey();
                 }
             }
             if (!res && (blinding_key = pwallet->GetBlindingKey(NULL)).IsValid()) {
                 // For outputs using deprecated static blinding.
-                res = UnblindOutput(blinding_key, vout[nOut], vAmountsOut[nOut], vBlindingFactors[nOut]);
+                res = UnblindOutput(blinding_key, vout[nOut], vAmountsOut.at(nOut), vBlindingFactors.at(nOut));
                 if (res) {
-                    vBlindingKeys[nOut] = blinding_key.GetPubKey();
+                    vBlindingKeys.at(nOut) = blinding_key.GetPubKey();
                 }
             }
             if (!res) {
-                vAmountsOut[nOut] = -1;
+                vAmountsOut.at(nOut) = -1;
             }
         }
     }
@@ -986,18 +986,18 @@ public:
     //! Returns either the value out (if it is to us) or 0
     CAmount GetValueOut(unsigned int nOut) const {
         FillValuesAndBlindingFactors(nOut);
-        return vAmountsOut[nOut];
+        return vAmountsOut.at(nOut);
     }
 
     //! Returns either the blinding factor (if it is to us) or 0
     std::vector<unsigned char> GetBlindingFactor(unsigned int nOut) const {
         FillValuesAndBlindingFactors(nOut);
-        return vBlindingFactors[nOut];
+        return vBlindingFactors.at(nOut);
     }
 
     CPubKey GetBlindingKey(unsigned int nOut) const {
         FillValuesAndBlindingFactors(nOut);
-        return vBlindingKeys[nOut];
+        return vBlindingKeys.at(nOut);
     }
 };
 
