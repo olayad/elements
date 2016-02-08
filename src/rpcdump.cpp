@@ -475,6 +475,7 @@ Value importblindingkey(const Array& params, bool fHelp)
     if (!pwalletMain->AddSpecificBlindingKey(CScriptID(GetScriptForDestination(address.Get())), keyval)) {
         throw JSONRPCError(RPC_WALLET_ERROR, "Failed to import blinding key");
     }
+    pwalletMain->MarkDirty();
 
     return Value::null;
 }
