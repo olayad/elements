@@ -947,7 +947,8 @@ public:
 
 private:
     void FillValuesAndBlindingFactors(unsigned int nOut) const {
-        if (!vAmountsOut.size()) {
+        assert(nOut < vout.size());
+        if (nOut >= vAmountsOut.size()) {
             vAmountsOut.resize(vout.size());
             vBlindingFactors.resize(vout.size());
             vBlindingKeys.resize(vout.size());
@@ -959,6 +960,7 @@ private:
             if (!res) {
                 // For unblinded outputs.
                 res = UnblindOutput(blinding_key, vout[nOut], vAmountsOut[nOut], vBlindingFactors[nOut]);
+                vBlindingKeys[nOut] = CPubKey();
             }
             if (!res && (blinding_key = pwallet->GetBlindingKey(&vout[nOut].scriptPubKey)).IsValid()) {
                 // For outputs using derived blinding.
