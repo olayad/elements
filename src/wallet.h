@@ -439,6 +439,8 @@ public:
     //! script == NULL gives the backward compatible blinding key
     CKey GetBlindingKey(const CScript* script) const;
     CPubKey GetBlindingPubKey(const CScript& script) const;
+
+    void ComputeBlindingData(const CTxOut& output, CAmount& amount, CPubKey& pubkey, uint256& blindingfactor) const;
 };
 
 /** A key allocated from the key pool. */
@@ -564,7 +566,7 @@ private:
     const CWallet* pwallet;
 
 public:
-    mapValue_t mapValue;
+    mutable mapValue_t mapValue;
     std::vector<std::pair<std::string, std::string> > vOrderForm;
     unsigned int fTimeReceivedIsTxTime;
     unsigned int nTimeReceived; //! time received by this node
@@ -574,7 +576,7 @@ public:
     int64_t nOrderPos; //! position in ordered transaction list
 
     // For each output
-    mutable std::vector<std::vector<unsigned char> > vBlindingFactors;
+    mutable std::vector<uint256> vBlindingFactors;
     mutable std::vector<CAmount> vAmountsOut;
     mutable std::vector<CPubKey> vBlindingKeys;
 
@@ -676,8 +678,6 @@ public:
         READWRITE(nTimeReceived);
         READWRITE(fFromMe);
         READWRITE(fSpent);
-        READWRITE(vBlindingFactors);
-        READWRITE(vAmountsOut);
 
         if (ser_action.ForRead())
         {
@@ -946,58 +946,27 @@ public:
 
 
 private:
-    void FillValuesAndBlindingFactors(unsigned int nOut) const {
-        assert(nOut < vout.size());
-        if (nOut >= vAmountsOut.size()) {
-            vAmountsOut.resize(vout.size());
-            vBlindingFactors.resize(vout.size());
-            vBlindingKeys.resize(vout.size());
-        }
-        if (vAmountsOut.at(nOut) == 0) {
-            std::vector<unsigned char> nonce(32, 0);
-            int res = 0;
-            CKey blinding_key;
-            if (!res) {
-                // For unblinded outputs.
-                res = UnblindOutput(blinding_key, vout[nOut], vAmountsOut.at(nOut), vBlindingFactors.at(nOut));
-                vBlindingKeys.at(nOut) = CPubKey();
-            }
-            if (!res && (blinding_key = pwallet->GetBlindingKey(&vout[nOut].scriptPubKey)).IsValid()) {
-                // For outputs using derived blinding.
-                res = UnblindOutput(blinding_key, vout[nOut], vAmountsOut.at(nOut), vBlindingFactors.at(nOut);
-                if (res) {
-                    vBlindingKeys.at(nOut) = blinding_key.GetPubKey();
-                }
-            }
-            if (!res && (blinding_key = pwallet->GetBlindingKey(NULL)).IsValid()) {
-                // For outputs using deprecated static blinding.
-                res = UnblindOutput(blinding_key, vout[nOut], vAmountsOut.at(nOut), vBlindingFactors.at(nOut));
-                if (res) {
-                    vBlindingKeys.at(nOut) = blinding_key.GetPubKey();
-                }
-            }
-            if (!res) {
-                vAmountsOut.at(nOut) = -1;
-            }
-        }
-    }
+    void GetBlindingData(unsigned int nOut, CAmount* pamountOut, CPubKey* ppubkeyOut, uint256* pblindingfactorOut) const;
 
 public:
     //! Returns either the value out (if it is to us) or 0
     CAmount GetValueOut(unsigned int nOut) const {
-        FillValuesAndBlindingFactors(nOut);
-        return vAmountsOut.at(nOut);
+        CAmount ret;
+        GetBlindingData(nOut, &ret, NULL, NULL);
+        return ret;
     }
 
     //! Returns either the blinding factor (if it is to us) or 0
-    std::vector<unsigned char> GetBlindingFactor(unsigned int nOut) const {
-        FillValuesAndBlindingFactors(nOut);
-        return vBlindingFactors.at(nOut);
+    uint256 GetBlindingFactor(unsigned int nOut) const {
+        uint256 ret;
+        GetBlindingData(nOut, NULL, NULL, &ret);
+        return ret;
     }
 
     CPubKey GetBlindingKey(unsigned int nOut) const {
-        FillValuesAndBlindingFactors(nOut);
-        return vBlindingKeys.at(nOut);
+        CPubKey ret;
+        GetBlindingData(nOut, NULL, &ret, NULL);
+        return ret;
     }
 };
 
