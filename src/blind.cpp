@@ -70,7 +70,7 @@ void BlindOutputs(const std::vector<uint256 >& input_blinding_factors, const std
 
     int nBlindsIn = 0;
     for (size_t nIn = 0; nIn < tx.vin.size(); nIn++) {
-        if (input_blinding_factors[nIn].size() != 0) {
+        if (input_blinding_factors[nIn] != uint256()) {
             assert(input_blinding_factors[nIn].size() == 32);
             blindptrs.push_back(input_blinding_factors[nIn].begin());
             nBlindsIn++;
@@ -80,9 +80,8 @@ void BlindOutputs(const std::vector<uint256 >& input_blinding_factors, const std
     int nBlindsOut = 0;
     int nToBlind = 0;
     for (size_t nOut = 0; nOut < tx.vout.size(); nOut++) {
-         assert((output_blinding_factors[nOut].size() != 0) == !tx.vout[nOut].nValue.IsAmount());
-         if (output_blinding_factors[nOut].size() != 0) {
-             assert(output_blinding_factors[nOut].size() == 32);
+         assert((output_blinding_factors[nOut] != uint256()) == !tx.vout[nOut].nValue.IsAmount());
+         if (output_blinding_factors[nOut] != uint256()) {
              blindptrs.push_back(output_blinding_factors[nOut].begin());
              nBlindsOut++;
          } else {
