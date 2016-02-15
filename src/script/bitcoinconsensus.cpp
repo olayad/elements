@@ -76,8 +76,8 @@ static bool verify_flags(unsigned int flags)
     return (flags & ~(bitcoinconsensus_SCRIPT_FLAGS_VERIFY_ALL)) == 0;
 }
 
-static int verify_script(const unsigned char *scriptPubKey, unsigned int scriptPubKeyLen, CAmount amount,
-                                    CAmount amountPreviousInput,
+static int verify_script(const unsigned char *scriptPubKey, unsigned int scriptPubKeyLen, CTxOutValue amount,
+                                   CTxOutValue amountPreviousInput,
                                     const unsigned char *txTo        , unsigned int txToLen,
                                     unsigned int nIn, unsigned int flags, bitcoinconsensus_error* err)
 {
@@ -96,7 +96,7 @@ static int verify_script(const unsigned char *scriptPubKey, unsigned int scriptP
         set_error(err, bitcoinconsensus_ERR_OK);
 
         PrecomputedTransactionData txdata(tx);
-        if (amountPreviousInput < -1 || (nIn != 0 && !MoneyRange(amountPreviousInput)))
+        if (amountPreviousInput.IsAmount() && (amountPreviousInput.GetAmount() < -1 || (nIn != 0 && !MoneyRange(amountPreviousInput.GetAmount()))))
             return VerifyScript(tx.vin[nIn].scriptSig, CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), &tx.vin[nIn].scriptWitness, flags, TransactionNoWithdrawsSignatureChecker(&tx, nIn, amount, txdata), NULL);
         else
             return VerifyScript(tx.vin[nIn].scriptSig, CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), &tx.vin[nIn].scriptWitness, flags, TransactionSignatureChecker(&tx, nIn, amount, amountPreviousInput, txdata), NULL);
@@ -105,13 +105,13 @@ static int verify_script(const unsigned char *scriptPubKey, unsigned int scriptP
     }
 }
 
-int bitcoinconsensus_verify_script_with_amount(const unsigned char *scriptPubKey, unsigned int scriptPubKeyLen, int64_t amount,
+int bitcoinconsensus_verify_script_with_amount(const unsigned char *scriptPubKey, unsigned int scriptPubKeyLen,
                                     int64_t amountPreviousInput,
                                     const unsigned char *txTo        , unsigned int txToLen,
                                     unsigned int nIn, unsigned int flags, bitcoinconsensus_error* err)
 {
-    CAmount am(amount);
-    CAmount prevInAm(amountPreviousInput);
+    CTxOutValue am(amount);
+    CTxOutValue prevInAm(amountPreviousInput);
     return ::verify_script(scriptPubKey, scriptPubKeyLen, am, prevInAm, txTo, txToLen, nIn, flags, err);
 }
 
@@ -124,8 +124,8 @@ int bitcoinconsensus_verify_script(const unsigned char *scriptPubKey, unsigned i
         return set_error(err, bitcoinconsensus_ERR_AMOUNT_REQUIRED);
     }
 
-    CAmount am(0);
-    CAmount prevInAm(-2);
+    CTxOutValue am(0);
+    CTxOutValue prevInAm(-2);
     return ::verify_script(scriptPubKey, scriptPubKeyLen, am, prevInAm, txTo, txToLen, nIn, flags, err);
 }
 
