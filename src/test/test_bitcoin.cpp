@@ -153,6 +153,13 @@ TestChain100Setup::~TestChain100Setup()
 }
 
 
+CAmount TotalValueOut(const CMutableTransaction& tx) {
+    CAmount nTotal = 0;
+    BOOST_FOREACH(const CTxOut& txo, tx.vout)
+        nTotal += txo.nValue;
+    return nTotal;
+}
+
 CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(const CMutableTransaction &tx, CTxMemPool *pool) {
     CTransaction txn(tx);
     return FromTx(txn, pool);

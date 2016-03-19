@@ -218,12 +218,14 @@ struct CMutableTransaction;
 /**
  * Basic transaction serialization format:
  * - int32_t nVersion
+ * - int32_t nTxFee
  * - std::vector<CTxIn> vin
  * - std::vector<CTxOut> vout
  * - uint32_t nLockTime
  *
  * Extended transaction serialization format:
  * - int32_t nVersion
+ * - int32_t nTxFee
  * - unsigned char dummy = 0x00
  * - unsigned char flags (!= 0)
  * - std::vector<CTxIn> vin
@@ -237,6 +239,7 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
     const bool fAllowWitness = !(s.GetVersion() & SERIALIZE_TRANSACTION_NO_WITNESS);
 
     s >> tx.nVersion;
+    s >> tx.nTxFee;
     unsigned char flags = 0;
     tx.vin.clear();
     tx.vout.clear();
@@ -272,6 +275,7 @@ inline void SerializeTransaction(const TxType& tx, Stream& s) {
     const bool fAllowWitness = !(s.GetVersion() & SERIALIZE_TRANSACTION_NO_WITNESS);
 
     s << tx.nVersion;
+    s << tx.nTxFee;
     unsigned char flags = 0;
     // Consistency check
     if (fAllowWitness) {
@@ -318,6 +322,7 @@ public:
     // and bypass the constness. This is safe, as they update the entire
     // structure, including the hash.
     const int32_t nVersion;
+    const CAmount nTxFee;
     const std::vector<CTxIn> vin;
     const std::vector<CTxOut> vout;
     const uint32_t nLockTime;
@@ -356,11 +361,6 @@ public:
 
     // Compute a hash that includes both transaction and witness data
     uint256 GetWitnessHash() const;
-
-    // Return sum of txouts.
-    CAmount GetValueOut() const;
-    // GetValueIn() is a method on CCoinsViewCache, because
-    // inputs must be known to compute value in.
 
     // Compute priority, given priority of inputs and (optionally) tx size
     double ComputePriority(double dPriorityInputs, unsigned int nTxSize=0) const;
@@ -407,6 +407,7 @@ public:
 struct CMutableTransaction
 {
     int32_t nVersion;
+    CAmount nTxFee;
     std::vector<CTxIn> vin;
     std::vector<CTxOut> vout;
     uint32_t nLockTime;
