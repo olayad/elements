@@ -8,6 +8,8 @@
 
 #include "script/interpreter.h"
 
+#include <secp256k1.h>
+#include <secp256k1_rangeproof.h>
 #include <vector>
 
 // DoS prevention: limit cache size to 32MB (over 1000000 entries on 64-bit
@@ -28,6 +30,19 @@ public:
     CachingTransactionSignatureChecker(const CTransaction* txToIn, unsigned int nInIn, const CTxOutValue& amount, const CTxOutValue& amountPreviousInput, bool storeIn, PrecomputedTransactionData& txdataIn) : TransactionSignatureChecker(txToIn, nInIn, amount, amountPreviousInput), store(storeIn) {}
 
     bool VerifySignature(const std::vector<unsigned char>& vchSig, const CPubKey& vchPubKey, const uint256& sighash) const;
+};
+
+class CachingRangeProofChecker
+{
+private:
+    bool store;
+public:
+    CachingRangeProofChecker(bool storeIn){
+        store = storeIn;
+    };
+
+    bool VerifyRangeProof(const std::vector<unsigned char>& vchRangeProof, const std::vector<unsigned char>& vchCommitment, const secp256k1_context* ctx) const;
+
 };
 
 void InitSignatureCache();
