@@ -269,7 +269,7 @@ static void MutateTxAddOutAddr(CMutableTransaction& tx, const std::string& strIn
     CScript scriptPubKey = GetScriptForDestination(addr.Get());
 
     // construct TxOut, append to transaction output list
-    CTxOut txout(value, scriptPubKey);
+    CTxOut txout(BITCOINID, value, scriptPubKey);
     if (addr.IsBlinded()) {
         CPubKey pubkey = addr.GetBlindingKey();
         txout.nValue.vchNonceCommitment = std::vector<unsigned char>(pubkey.begin(), pubkey.end());
@@ -412,7 +412,7 @@ static void MutateTxAddOutData(CMutableTransaction& tx, const std::string& strIn
 
     std::vector<unsigned char> data = ParseHex(strData);
 
-    CTxOut txout(value, CScript() << OP_RETURN << data);
+    CTxOut txout(BITCOINID, value, CScript() << OP_RETURN << data);
     tx.vout.push_back(txout);
     tx.nTxFee -= value;
 }
@@ -495,7 +495,7 @@ static void MutateTxAddOutScript(CMutableTransaction& tx, const std::string& str
     }
 
     // construct TxOut, append to transaction output list
-    CTxOut txout(value, scriptPubKey);
+    CTxOut txout(BITCOINID, value, scriptPubKey);
     tx.vout.push_back(txout);
     tx.nTxFee -= value;
 }
