@@ -710,7 +710,7 @@ UniValue importblindingkey(const UniValue& params, bool fHelp)
             "importblindingkey \"address\" \"blindinghex\"\n"
             "\nImports a private blinding key in hex for a CT address."
             "\nArguments:\n"
-            "1. \"address\"          (string, required) The CT address\n"
+            "1. \"address\"          (string, required) The CT or P2SH address\n"
             "2. \"hexkey\"           (string, required) The blinding key in hex\n"
         );
 
@@ -719,9 +719,6 @@ UniValue importblindingkey(const UniValue& params, bool fHelp)
     CBitcoinAddress address(params[0].get_str());
     if (!address.IsValid()) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Bitcoin address or script");
-    }
-    if (!address.IsBlinded()) {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Not a CT address");
     }
 
     if (!IsHex(params[1].get_str())) {
@@ -734,8 +731,13 @@ UniValue importblindingkey(const UniValue& params, bool fHelp)
 
     CKey key;
     key.Set(keydata.begin(), keydata.end(), true);
-    if (!key.IsValid() || key.GetPubKey() != address.GetBlindingKey()) {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Address and key do not match");
+
+    if (!address.IsBlinded() && !GetScriptForDestination(address.Get()).IsPayToScriptHash()) {
+       throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Address must be CT or unblinded P2SH");
+    }
+
+    if (!key.IsValid() || address.IsBlinded() && key.GetPubKey() != address.GetBlindingKey()) {
+       throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Address and key do not match");
     }
 
     uint256 keyval;
