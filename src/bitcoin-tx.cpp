@@ -490,38 +490,28 @@ static void MutateTxBlind(CMutableTransaction& tx, const std::string& strInput)
 
 static void MutateTxAddOutScript(CMutableTransaction& tx, const std::string& strInput)
 {
-    // separate VALUE:SCRIPT[:FLAGS]
-    std::vector<std::string> vStrInputParts;
-    boost::split(vStrInputParts, strInput, boost::is_any_of(":"));
-    if (vStrInputParts.size() < 2)
-        throw std::runtime_error("TX output missing separator");
+    // separate VALUE:SCRIPT:ASSET in string
+    std::vector<std::string> vStrOutScriptParts;
+    boost::split(vStrOutScriptParts, strInput, boost::is_any_of(":"));
+    if (vStrOutScriptParts.size()<3)
+        throw runtime_error("TX out script missing separator");
 
     // Extract and validate VALUE
-    CAmount value = ExtractAndValidateValue(vStrInputParts[0]);
+    string strValue = vStrOutScriptParts[0];
+    CAmount value;
+    if (!ParseMoney(strValue, value))
+        throw std::runtime_error("invalid TX output value");
 
     // extract and validate script
-    std::string strScript = vStrInputParts[1];
-    CScript scriptPubKey = ParseScript(strScript);
+    string strScript = vStrOutScriptParts[1];
+    CScript scriptPubKey = ParseScript(strScript); // throws on err
 
-    // Extract FLAGS
-    bool bSegWit = false;
-    bool bScriptHash = false;
-    if (vStrInputParts.size() == 3) {
-        std::string flags = vStrInputParts.back();
-        bSegWit = (flags.find("W") != std::string::npos);
-        bScriptHash = (flags.find("S") != std::string::npos);
-    }
-
-    if (bSegWit) {
-      scriptPubKey = GetScriptForWitness(scriptPubKey);
-    }
-    if (bScriptHash) {
-      CBitcoinAddress addr(scriptPubKey);
-      scriptPubKey = GetScriptForDestination(addr.Get());
-    }
+    // extract and validate asset
+    string strAsset = vStrOutScriptParts[2];
+    CAssetID asset = uint256S(strAsset);
 
     // construct TxOut, append to transaction output list
-    CTxOut txout(BITCOINID, value, scriptPubKey);
+    CTxOut txout(asset, value, scriptPubKey);
     tx.vout.push_back(txout);
 }
 
