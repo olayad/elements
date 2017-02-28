@@ -14,6 +14,7 @@
 #include "validation.h"
 #include "net.h"
 #include "policy/policy.h"
+#include "policy/policy.h"
 #include "policy/rbf.h"
 #include "primitives/bitcoin/merkleblock.h"
 #include "primitives/bitcoin/transaction.h"
@@ -1975,7 +1976,7 @@ UniValue gettransaction(const JSONRPCRequest& request)
     CAmountMap nCredit = wtx.GetCredit(filter);
     CAmountMap nDebit = wtx.GetDebit(filter);
     assert(wtx.tx->HasValidFee());
-    CAmount nFee = (wtx.IsFromMe(filter) ? -wtx.tx->GetFee()[BITCOINID] : 0);
+    CAmount nFee = (wtx.IsFromMe(filter) ? -wtx.tx->GetFee()[policyAsset] : 0);
     CAmountMap nNet = nCredit - nDebit;
     nNet[pwalletMain->GetAssetFromLabel("bitcoin")] -= nFee;
 
