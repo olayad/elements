@@ -72,11 +72,6 @@ CAmount CTxOutValue::GetAmount() const
     return ReadBE64(&vchCommitment[1]);
 }
 
-void CTxOutValue::SetToBitcoinAmount(const CAmount nAmount) {
-    SetToAmount(nAmount);
-    vchCommitment[0] = 0;
-}
-
 void CTxOutValue::SetToAmount(const CAmount nAmount) {
     vchCommitment.resize(nExplicitSize);
     vchCommitment[0] = 1;
