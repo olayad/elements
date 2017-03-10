@@ -113,11 +113,11 @@ int bitcoinconsensus_verify_script_with_amount(const unsigned char *scriptPubKey
 {
     try {
         TxInputStream stream(SER_NETWORK, PROTOCOL_VERSION, amount, amountLen);
-        CTxOutValue am;
+        CConfidentialValue am;
         stream >> am;
 
         TxInputStream stream2(SER_NETWORK, PROTOCOL_VERSION, amountPreviousInput, amountPreviousInputLen);
-        CTxOutValue prevInAm;
+        CConfidentialValue prevInAm;
         stream >> prevInAm;
 
         return ::verify_script(scriptPubKey, scriptPubKeyLen, am, prevInAm, txTo, txToLen, nIn, flags, err);
@@ -135,8 +135,8 @@ int bitcoinconsensus_verify_script(const unsigned char *scriptPubKey, unsigned i
         return set_error(err, bitcoinconsensus_ERR_AMOUNT_REQUIRED);
     }
 
-    CTxOutValue am(0);
-    CTxOutValue prevInAm(-2);
+    CConfidentialValue am(0);
+    CConfidentialValue prevInAm(-2);
     return ::verify_script(scriptPubKey, scriptPubKeyLen, am, prevInAm, txTo, txToLen, nIn, flags, err);
 }
 
