@@ -151,7 +151,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry)
             out.push_back(Pair("asset", asset.GetAsset().GetHex()));
         }
         else if (asset.IsCommitment()) {
-            out.push_back(Pair("assettag", HexStr(asset.vchCommitment)));
+            out.push_back(Pair("assetcommitment", HexStr(asset.vchCommitment)));
         }
 
         {
@@ -232,7 +232,7 @@ UniValue getrawtransaction(const JSONRPCRequest& request)
             "       \"fee_value\" : x.xxx,        (numeric) The fee value in " + CURRENCY_UNIT + "\n"
             "       \"n\" : n,                    (numeric) index\n"
             "       \"asset\" : \"hex\"           (string) the asset id, if unblinded\n"
-            "       \"assettag\" : \"hex\"        (string) the asset tag, if blinded\n"
+            "       \"assetcommitment\" : \"hex\" (string) the asset tag, if blinded\n"
             "       \"scriptPubKey\" : {          (json object)\n"
             "         \"asm\" : \"asm\",          (string) the asm\n"
             "         \"hex\" : \"hex\",          (string) the hex\n"
@@ -855,7 +855,7 @@ UniValue decoderawtransaction(const JSONRPCRequest& request)
             "       \"value\" : x.xxx,            (numeric) The value in " + CURRENCY_UNIT + "\n"
             "       \"n\" : n,                    (numeric) index\n"
             "       \"asset\" : \"hex\"           (string) the asset id, if unblinded\n"
-            "       \"assettag\" : \"hex\"        (string) the asset tag, if blinded\n"
+            "       \"assetcommitment\" : \"hex\" (string) the asset tag, if blinded\n"
             "       \"scriptPubKey\" : {          (json object)\n"
             "         \"asm\" : \"asm\",          (string) the asm\n"
             "         \"hex\" : \"hex\",          (string) the hex\n"
