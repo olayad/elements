@@ -2646,12 +2646,19 @@ bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount& nFeeRet, bool ov
     if (!CreateTransaction(vecSend, wtx, vpChangeKey, nFeeRet, nChangePosInOut, strFailReason, &coinControl, false))
         return false;
 
-    if (nChangePosInOut != -1)
+    // Append fee output if any
+    // This assumes fee is appended to end, and only one fee added by the CreateTransaction call
+    if (wtx.vout.back().IsFee()) {
+        tx.vout.push_back(wtx.vout.back());
+    }
+
+    if (nChangePosInOut != -1) {
         tx.vout.insert(tx.vout.begin() + nChangePosInOut, wtx.tx->vout[nChangePosInOut]);
 
-    // Copy output sizes from new transaction; they may have had the fee subtracted from them
-    for (unsigned int idx = 0; idx < tx.vout.size(); idx++)
-        tx.vout[idx].nValue = wtx.tx->vout[idx].nValue;
+        // Insert change witness
+        tx.wit.vtxoutwit.resize(tx.vout.size()-1);
+        tx.wit.vtxoutwit.insert(tx.wit.vtxoutwit.begin() + nChangePosInOut,  wtx.wit.vtxoutwit[nChangePosInOut]);
+    }
 
     // Add new txins (keeping original txin scriptSig/order)
     BOOST_FOREACH(const CTxIn& txin, wtx.tx->vin)
