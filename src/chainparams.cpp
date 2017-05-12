@@ -44,13 +44,14 @@ static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesi
     return genesis;
 }
 
-/**
- * Elements Beta.
 void CChainParams::UpdateBIP9Parameters(Consensus::DeploymentPos d, int64_t nStartTime, int64_t nTimeout)
 {
     consensus.vDeployments[d].nStartTime = nStartTime;
     consensus.vDeployments[d].nTimeout = nTimeout;
 }
+
+/**
+ * Elements Beta.
 
  */
 class CElementsParams : public CChainParams {
@@ -115,11 +116,15 @@ public:
 
         checkpointData = (CCheckpointData){
             boost::assign::map_list_of
-            (     0, consensus.hashGenesisBlock),
+            (     0, consensus.hashGenesisBlock)
+        };
+
+        chainTxData = ChainTxData{
             0,
             0,
             0
         };
+
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,111);
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,196);
         base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,239);
@@ -297,7 +302,7 @@ std::unique_ptr<CChainParams> CreateChainParams(const std::string& chain)
     if (chain == CBaseChainParams::MAIN)
         return std::unique_ptr<CChainParams>(new CMainParams());
     else if (chain == CHAINPARAMS_ELEMENTS)
-        return new CElementsParams();
+        return std::unique_ptr<CChainParams>(new CElementsParams());
     else if (chain == CBaseChainParams::REGTEST)
         return std::unique_ptr<CChainParams>(new CRegTestParams());
     else if (chain == CBaseChainParams::CUSTOM) {

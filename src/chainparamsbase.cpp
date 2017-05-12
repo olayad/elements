@@ -89,7 +89,7 @@ std::unique_ptr<CBaseChainParams> CreateBaseChainParams(const std::string& chain
     if (chain == CBaseChainParams::MAIN)
         return std::unique_ptr<CBaseChainParams>(new CBaseMainParams());
     else if (chain == CHAINPARAMS_ELEMENTS)
-        return new CBaseElementsParams();
+        return std::unique_ptr<CBaseChainParams>(new CBaseElementsParams());
     else if (chain == CBaseChainParams::REGTEST)
         return std::unique_ptr<CBaseChainParams>(new CBaseRegTestParams());
     else if (chain == CBaseChainParams::CUSTOM)
