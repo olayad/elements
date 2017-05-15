@@ -324,13 +324,13 @@ COutPoint CScript::GetWithdrawSpent() const
         vector<unsigned char> vTx;
         if (!PopWithdrawPush(pushes, &vTx))
             return COutPoint();
-        CTransaction tx;
+        CTransactionRef tx;
         CDataStream(vTx, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_BITCOIN_BLOCK_OR_TX) >> tx;
 
-        if (ntxOut < 0 || (unsigned int)ntxOut >= tx.vout.size())
+        if (ntxOut < 0 || (unsigned int)ntxOut >= tx->vout.size())
             return COutPoint();
 
-        return COutPoint(tx.GetHash(), ntxOut);
+        return COutPoint(tx->GetHash(), ntxOut);
     } catch (std::exception& e) {
         return COutPoint();
     }
