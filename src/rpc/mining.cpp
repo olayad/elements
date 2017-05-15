@@ -101,9 +101,9 @@ UniValue generate(const JSONRPCRequest& request)
     throw JSONRPCError(RPC_METHOD_NOT_FOUND, "This method cannot be used in private chain mode");
 }
 
-UniValue getnewblockhex(const UniValue& params, bool fHelp)
+UniValue getnewblockhex(const JSONRPCRequest& request)
 {
-    if (fHelp || params.size() != 0)
+    if (request.fHelp || request.params.size() != 0)
         throw runtime_error(
             "getnewblockhex\n"
             "\nGets hex representation of a proposed, unmined new block\n"
@@ -113,11 +113,7 @@ UniValue getnewblockhex(const UniValue& params, bool fHelp)
             + HelpExampleCli("getnewblockhex", "")
         );
 
-    CScript coinbaseDest(Params().CoinbaseDestination());
-    if (coinbaseDest == CScript())
-        coinbaseDest = CScript() << OP_TRUE;
-
-    std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler(Params()).CreateNewBlock(coinbaseDest));
+    std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler(Params()).CreateNewBlock(CScript() << OP_TRUE));
     if (!pblocktemplate.get())
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Wallet keypool empty");
     {
@@ -132,9 +128,9 @@ UniValue getnewblockhex(const UniValue& params, bool fHelp)
     return HexStr(ssBlock.begin(), ssBlock.end());
 }
 
-UniValue combineblocksigs(const UniValue& params, bool fHelp)
+UniValue combineblocksigs(const JSONRPCRequest& request)
 {
-    if (fHelp || params.size() != 2)
+    if (request.fHelp || request.params.size() != 2)
         throw runtime_error(
             "combineblocksigs \"blockhex\" [\"signature\",...]\n"
             "\nMerges signatures on a block proposal\n"
@@ -155,11 +151,11 @@ UniValue combineblocksigs(const UniValue& params, bool fHelp)
         );
 
     CBlock block;
-    if (!DecodeHexBlk(block, params[0].get_str()))
+    if (!DecodeHexBlk(block, request.params[0].get_str()))
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
 
     UniValue result(UniValue::VOBJ);
-    const UniValue& sigs = params[1].get_array();
+    const UniValue& sigs = request.params[1].get_array();
     for (unsigned int i = 0; i < sigs.size(); i++) {
         const std::string& sig = sigs[i].get_str();
         if (!IsHex(sig))
@@ -896,8 +892,8 @@ static const CRPCCommand commands[] =
     { "mining",             "submitblock",            &submitblock,            true,  {"hexdata","parameters"} },
 
     { "generating",         "generate",               &generate,               true,  {"nblocks","maxtries"} },
-    { "generating",         "combineblocksigs",       &combineblocksigs,       true  },
-    { "generating",         "getnewblockhex",         &getnewblockhex,         true  },
+    { "generating",         "combineblocksigs",       &combineblocksigs,       true,  {} },
+    { "generating",         "getnewblockhex",         &getnewblockhex,         true,  {} },
 
     { "util",               "estimatefee",            &estimatefee,            true,  {"nblocks"} },
     { "util",               "estimatepriority",       &estimatepriority,       true,  {"nblocks"} },

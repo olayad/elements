@@ -2985,12 +2985,12 @@ UniValue bumpfee(const JSONRPCRequest& request)
     return result;
 }
 
-UniValue signblock(const UniValue& params, bool fHelp)
+UniValue signblock(const JSONRPCRequest& request)
 {
-    if (!EnsureWalletIsAvailable(fHelp))
+    if (!EnsureWalletIsAvailable(request.fHelp))
         return NullUniValue;
 
-    if (fHelp || params.size() != 1)
+    if (request.fHelp || request.params.size() != 1)
         throw runtime_error(
             "signblock \"blockhex\"\n"
             "\nSigns a block proposal, checking that it would be accepted first\n"
@@ -3003,7 +3003,7 @@ UniValue signblock(const UniValue& params, bool fHelp)
         );
 
     CBlock block;
-    if (!DecodeHexBlk(block, params[0].get_str()))
+    if (!DecodeHexBlk(block, request.params[0].get_str()))
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
 
     LOCK(cs_main);

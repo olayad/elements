@@ -121,7 +121,7 @@ std::string EncodeHexTx(const CTransaction& tx, const int serialFlags)
     return HexStr(ssTx.begin(), ssTx.end());
 }
 
-string EncodeHexBlock(const CBlock& block)
+std::string EncodeHexBlock(const CBlock& block)
 {
     CDataStream ssBlock(SER_NETWORK, PROTOCOL_VERSION);
     ssBlock << block;
