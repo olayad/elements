@@ -38,8 +38,8 @@ bool CCoinsViewDB::HaveCoins(const uint256 &txid) const {
     return db.Exists(std::make_pair(DB_COINS, txid));
 }
 
-bool CCoinsViewDB::IsWithdrawSpent(const pair<uint256, COutPoint> &outpoint) const {
-    return db.Exists(make_pair(DB_WITHDRAW_FLAG, outpoint));
+bool CCoinsViewDB::IsWithdrawSpent(const std::pair<uint256, COutPoint> &outpoint) const {
+    return db.Exists(std::make_pair(DB_WITHDRAW_FLAG, outpoint));
 }
 
 uint256 CCoinsViewDB::GetBestBlock() const {
@@ -57,9 +57,9 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
         if (it->second.flags & CCoinsCacheEntry::DIRTY) {
             if (it->second.flags & CCoinsCacheEntry::WITHDRAW) {
                 if (!it->second.withdrawSpent)
-                    batch.Erase(make_pair(DB_WITHDRAW_FLAG, it->first));
+                    batch.Erase(std::make_pair(DB_WITHDRAW_FLAG, it->first));
                 else
-                    batch.Write(make_pair(DB_WITHDRAW_FLAG, it->first), '1');
+                    batch.Write(std::make_pair(DB_WITHDRAW_FLAG, it->first), '1');
             } else {
                 if (it->second.coins.IsPruned())
                     batch.Erase(std::make_pair(DB_COINS, it->first.first));
