@@ -695,7 +695,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState& state, const C
             CCoins coins;
             assert(view.GetCoins(txin.prevout.hash, coins));
             if (coins.vout[txin.prevout.n].scriptPubKey.IsWithdrawLock() && txin.scriptSig.IsWithdrawProof()) {
-                pair<uint256, COutPoint> outpoint = make_pair(coins.vout[txin.prevout.n].scriptPubKey.GetWithdrawLockGenesisHash(), txin.scriptSig.GetWithdrawSpent());
+                std::pair<uint256, COutPoint> outpoint = std::make_pair(coins.vout[txin.prevout.n].scriptPubKey.GetWithdrawLockGenesisHash(), txin.scriptSig.GetWithdrawSpent());
                 if (view.IsWithdrawSpent(outpoint))
                     return state.Invalid(false, REJECT_CONFLICT, "withdraw-already-claimed");
                 setWithdrawsSpent.insert(outpoint);

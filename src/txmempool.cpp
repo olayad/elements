@@ -667,7 +667,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
 
     LOCK(cs);
     std::list<const CTxMemPoolEntry*> waitingOnDependants;
-    set<pair<uint256, COutPoint> > setGlobalWithdrawsSpent;
+    std::set<std::pair<uint256, COutPoint> > setGlobalWithdrawsSpent;
     for (indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++) {
         unsigned int i = 0;
         checkTotal += it->GetTxSize();
