@@ -946,7 +946,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState& state, const C
             scriptVerifyFlags = GetArg("-promiscuousmempoolflags", scriptVerifyFlags);
         }
 
-        set<pair<uint256, COutPoint> > setWithdrawsSpent2;
+        std::set<std::pair<uint256, COutPoint> > setWithdrawsSpent2;
 
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
@@ -957,9 +957,9 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState& state, const C
             // to see if the failure is specifically due to witness validation.
             setWithdrawsSpent2.clear();
             CValidationState stateDummy; // Want reported failures to be from first CheckInputs
-            if (!tx.HasWitness() && CheckInputs(tx, stateDummy, view, true, scriptVerifyFlags & ~(SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_CLEANSTACK), true, txdata, setWithdrawsSpent2)
+            if (!tx.HasWitness() && CheckInputs(tx, stateDummy, view, true, scriptVerifyFlags & ~(SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_CLEANSTACK), true, txdata, setWithdrawsSpent2)) {
                 setWithdrawsSpent2.clear();
-                if (!CheckInputs(tx, stateDummy, view, true, scriptVerifyFlags & ~SCRIPT_VERIFY_CLEANSTACK, true, txdata, setWithdrawSpent2)) {
+                if (!CheckInputs(tx, stateDummy, view, true, scriptVerifyFlags & ~SCRIPT_VERIFY_CLEANSTACK, true, txdata, setWithdrawsSpent2)) {
                 setWithdrawsSpent2.clear();
                 // Only the witness is missing, so the transaction itself may be fine.
                     state.SetCorruptionPossible();
@@ -1343,7 +1343,7 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo &txund
                 assert(false);
 
             if (coins->vout[txin.prevout.n].scriptPubKey.IsWithdrawLock() && txin.scriptSig.IsWithdrawProof()) {
-                pair<uint256, COutPoint> outpoint = make_pair(coins->vout[txin.prevout.n].scriptPubKey.GetWithdrawLockGenesisHash(), txin.scriptSig.GetWithdrawSpent());
+                std::pair<uint256, COutPoint> outpoint = std::make_pair(coins->vout[txin.prevout.n].scriptPubKey.GetWithdrawLockGenesisHash(), txin.scriptSig.GetWithdrawSpent());
                 inputs.SetWithdrawSpent(outpoint, true);
             }
 
@@ -1416,7 +1416,7 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
             if (coins->vout[prevout.n].scriptPubKey.IsWithdrawLock() && tx.vin[i].scriptSig.IsWithdrawProof()) {
                 uint256 genesisHash(coins->vout[prevout.n].scriptPubKey.GetWithdrawLockGenesisHash());
                 COutPoint withdrawSpent(tx.vin[i].scriptSig.GetWithdrawSpent());
-                pair<uint256, COutPoint> withdraw = make_pair(genesisHash, withdrawSpent);
+                std::pair<uint256, COutPoint> withdraw = std::make_pair(genesisHash, withdrawSpent);
                 if (inputs.IsWithdrawSpent(withdraw))
                     return state.Invalid(false, REJECT_INVALID, "bad-txns-double-withdraw", strprintf("Double-withdraw of %s:%d", withdrawSpent.hash.ToString(), withdrawSpent.n));
                 if (setWithdrawsSpent.count(withdraw))
@@ -1441,7 +1441,7 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
 }
 }// namespace Consensus
 
-bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsViewCache &inputs, bool fScriptChecks, unsigned int flags, bool cacheStore, PrecomputedTransactionData& txdata, set<pair<uint256, COutPoint> >& setWithdrawsSpent, std::vector<CScriptCheck> *pvChecks)
+bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsViewCache &inputs, bool fScriptChecks, unsigned int flags, bool cacheStore, PrecomputedTransactionData& txdata, std::set<std::pair<uint256, COutPoint> >& setWithdrawsSpent, std::vector<CScriptCheck> *pvChecks)
 {
     if (!tx.IsCoinBase())
     {
@@ -1613,7 +1613,7 @@ bool ApplyTxInUndo(const CTxInUndo& undo, CCoinsViewCache& view, const COutPoint
             if (!txin.scriptSig.IsPushOnly())
                 fClean = fClean && error("%s: lock spent by non-proof", __func__);
         } else {
-            pair<uint256, COutPoint> outpoint = make_pair(undo.txout.scriptPubKey.GetWithdrawLockGenesisHash(), txin.scriptSig.GetWithdrawSpent());
+            std::pair<uint256, COutPoint> outpoint = std::make_pair(undo.txout.scriptPubKey.GetWithdrawLockGenesisHash(), txin.scriptSig.GetWithdrawSpent());
             bool fSpent = view.IsWithdrawSpent(outpoint);
             if (!fSpent)
                 fClean = fClean && error("%s: withdraw not marked spent", __func__);
@@ -1778,7 +1778,7 @@ static int64_t nTimeIndex = 0;
 static int64_t nTimeCallbacks = 0;
 static int64_t nTimeTotal = 0;
 
-bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex, CCoinsViewCache& view, const CChainParams& chainparams, set<pair<uint256, COutPoint> >* setWithdrawsSpent, bool fJustCheck)
+bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex, CCoinsViewCache& view, const CChainParams& chainparams, std::set<std::pair<uint256, COutPoint> >* setWithdrawsSpent, bool fJustCheck)
 {
     AssertLockHeld(cs_main);
 
@@ -1911,7 +1911,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     std::vector<PrecomputedTransactionData> txdata;
     txdata.reserve(block.vtx.size()); // Required so that pointers to individual PrecomputedTransactionData don't get invalidated
 
-    set<std::pair<uint256, COutPoint> > setWithdrawsSpentDummy;
+    std::set<std::pair<uint256, COutPoint> > setWithdrawsSpentDummy;
 
     for (unsigned int i = 0; i < block.vtx.size(); i++)
     {
@@ -2308,7 +2308,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     int64_t nTime2 = GetTimeMicros(); nTimeReadFromDisk += nTime2 - nTime1;
     int64_t nTime3;
     LogPrint("bench", "  - Load block from disk: %.2fms [%.2fs]\n", (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
-    set<pair<uint256, COutPoint> > setWithdrawsSpent;
+    std::set<std::pair<uint256, COutPoint> > setWithdrawsSpent;
     {
         CCoinsViewCache view(pcoinsTip);
         bool rv = ConnectBlock(blockConnecting, state, pindexNew, view, chainparams, &setWithdrawsSpent);
