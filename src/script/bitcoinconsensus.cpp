@@ -97,7 +97,7 @@ static int verify_script(const unsigned char *scriptPubKey, unsigned int scriptP
 
         PrecomputedTransactionData txdata(tx);
         if (amountPreviousInput < -1 || (nIn != 0 && !MoneyRange(amountPreviousInput)))
-            return VerifyScript(tx.vin[nIn].scriptSig, CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), &tx.vin[nIn].scriptWitness, flags, TransactionNoWithdrawSignatureChecker(&tx, nIn, amount, txdata), NULL);
+            return VerifyScript(tx.vin[nIn].scriptSig, CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), &tx.vin[nIn].scriptWitness, flags, TransactionNoWithdrawsSignatureChecker(&tx, nIn, amount, txdata), NULL);
         else
             return VerifyScript(tx.vin[nIn].scriptSig, CScript(scriptPubKey, scriptPubKey + scriptPubKeyLen), &tx.vin[nIn].scriptWitness, flags, TransactionSignatureChecker(&tx, nIn, amount, amountPreviousInput, txdata), NULL);
     } catch (const std::exception&) {
@@ -106,7 +106,7 @@ static int verify_script(const unsigned char *scriptPubKey, unsigned int scriptP
 }
 
 int bitcoinconsensus_verify_script_with_amount(const unsigned char *scriptPubKey, unsigned int scriptPubKeyLen, int64_t amount,
-                                    uint64_t amountPreviousInput,
+                                    int64_t amountPreviousInput,
                                     const unsigned char *txTo        , unsigned int txToLen,
                                     unsigned int nIn, unsigned int flags, bitcoinconsensus_error* err)
 {
