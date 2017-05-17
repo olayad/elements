@@ -11,6 +11,7 @@
 
 #include <univalue.h>
 
+static const bool DEFAULT_NAMED=false;
 static const char DEFAULT_RPCCONNECT[] = "127.0.0.1";
 static const int DEFAULT_HTTP_CLIENT_TIMEOUT=900;
 

@@ -20,7 +20,6 @@
 #include "support/events.h"
 #include <univalue.h>
 
-static const bool DEFAULT_NAMED=false;
 static const int CONTINUE_EXECUTION=-1;
 std::string HelpMessageCli()
 {
@@ -101,46 +100,6 @@ static int AppInitRPC(int argc, char* argv[])
     }
     return CONTINUE_EXECUTION;
 }
-
-    HTTPReply(): status(0), error(-1) {}
-
-    int error;
-const char *http_errorstring(int code)
-{
-    switch(code) {
-#if LIBEVENT_VERSION_NUMBER >= 0x02010300
-    case EVREQ_HTTP_TIMEOUT:
-        return "timeout reached";
-    case EVREQ_HTTP_EOF:
-        return "EOF reached";
-    case EVREQ_HTTP_INVALID_HEADER:
-        return "error while reading header, or invalid header";
-    case EVREQ_HTTP_BUFFER_ERROR:
-        return "error encountered while reading or writing";
-    case EVREQ_HTTP_REQUEST_CANCEL:
-        return "request was canceled";
-    case EVREQ_HTTP_DATA_TOO_LONG:
-        return "response body is larger than allowed";
-#endif
-    default:
-        return "unknown";
-    }
-}
-
-static void http_request_done(struct evhttp_request *req, void *ctx)
-{
-    HTTPReply *reply = static_cast<HTTPReply*>(ctx);
-
-    if (req == NULL) {
-        /* If req is NULL, it means an error occurred while connecting: the
-         * error code will have been passed to http_error_cb.
-#if LIBEVENT_VERSION_NUMBER >= 0x02010300
-static void http_error_cb(enum evhttp_request_error err, void *ctx)
-{
-    HTTPReply *reply = static_cast<HTTPReply*>(ctx);
-    reply->error = err;
-}
-#endif
 
 int CommandLineRPC(int argc, char *argv[])
 {
