@@ -601,8 +601,8 @@ void CTxMemPool::removeConflicts(const CTransaction &tx)
 /**
  * Called when a block is connected. Removes from mempool and updates the miner fee estimator.
  */
-void CTxMemPool::removeForBlock(const std::vector<CTransactionRef>& vtx, unsigned int nBlockHeight)
-                                const std::set<std::pair<uint256, COutPoint> >& setWithdrawsSpent,
+void CTxMemPool::removeForBlock(const std::vector<CTransactionRef>& vtx, unsigned int nBlockHeight,
+                                const std::set<std::pair<uint256, COutPoint> >& setWithdrawsSpent)
 {
     LOCK(cs);
     std::vector<const CTxMemPoolEntry*> entries;

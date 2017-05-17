@@ -417,7 +417,8 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorIndexingTest)
     /* after tx6 is mined, tx7 should move up in the sort */
     std::vector<CTransactionRef> vtx;
     vtx.push_back(MakeTransactionRef(tx6));
-    pool.removeForBlock(vtx, 1);
+    std::set<std::pair<uint256, COutPoint> > setWithdrawsSpent;
+    pool.removeForBlock(vtx, 1, setWithdrawsSpent);
 
     sortedOrder.erase(sortedOrder.begin()+1);
     // Ties are broken by hash
