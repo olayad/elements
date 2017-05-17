@@ -614,7 +614,7 @@ BOOST_AUTO_TEST_CASE(WithdrawsSpentTest)
     pool.addUnchecked(tx1Hash, entry.WithdrawsSpent(setWithdrawsSpent).FromTx(tx));
     BOOST_CHECK(pool.mapWithdrawsSpentToTxid.empty());
 
-    setWithdrawsSpent = boost::assign::list_of(withdraw1);
+    setWithdrawsSpent = {withdraw1};
     GetRandBytes(tx.vin[0].prevout.hash.begin(), tx.vin[0].prevout.hash.size());
     tx.vout.resize(2);
     tx.vout[1].nValue = 0;
@@ -622,7 +622,7 @@ BOOST_AUTO_TEST_CASE(WithdrawsSpentTest)
     pool.addUnchecked(tx2Hash, entry.WithdrawsSpent(setWithdrawsSpent).FromTx(tx));
     BOOST_CHECK_EQUAL(pool.mapWithdrawsSpentToTxid[withdraw1].ToString(), tx2Hash.ToString());
 
-    setWithdrawsSpent = boost::assign::list_of(withdraw2);
+    setWithdrawsSpent = {withdraw2};
     GetRandBytes(tx.vin[0].prevout.hash.begin(), tx.vin[0].prevout.hash.size());
     tx.vout.resize(3);
     tx.vout[2].nValue = 0;
@@ -630,29 +630,30 @@ BOOST_AUTO_TEST_CASE(WithdrawsSpentTest)
     pool.addUnchecked(tx3Hash, entry.WithdrawsSpent(setWithdrawsSpent).FromTx(tx));
     BOOST_CHECK_EQUAL(pool.mapWithdrawsSpentToTxid[withdraw2].ToString(), tx3Hash.ToString());
 
-    setWithdrawsSpent = boost::assign::list_of(withdraw3);
+    setWithdrawsSpent = {withdraw3};
     GetRandBytes(tx.vin[0].prevout.hash.begin(), tx.vin[0].prevout.hash.size());
     tx.vout.resize(4);
     tx.vout[3].nValue = 0;
-    std::list<CTransaction> conflicts;
-    pool.removeForBlock(boost::assign::list_of(tx), 1, setWithdrawsSpent, conflicts);
+    CTransactionRef txref(MakeTransactionRef(tx));
+    pool.removeForBlock({txref}, 1, setWithdrawsSpent);
 
     BOOST_CHECK_EQUAL(pool.size(), 3);
     BOOST_CHECK_EQUAL(pool.mapWithdrawsSpentToTxid.size(), 2);
     BOOST_CHECK_EQUAL(pool.mapWithdrawsSpentToTxid[withdraw1].ToString(), tx2Hash.ToString());
     BOOST_CHECK_EQUAL(pool.mapWithdrawsSpentToTxid[withdraw2].ToString(), tx3Hash.ToString());
 
-    setWithdrawsSpent = boost::assign::list_of(withdraw1);
+    setWithdrawsSpent = {withdraw1};
     GetRandBytes(tx.vin[0].prevout.hash.begin(), tx.vin[0].prevout.hash.size());
     tx.vout.resize(5);
     tx.vout[4].nValue = 0;
-    pool.removeForBlock(boost::assign::list_of(tx), 2, setWithdrawsSpent, conflicts);
+    txref = MakeTransactionRef(tx);
+    pool.removeForBlock({txref}, 2, setWithdrawsSpent);
 
     BOOST_CHECK_EQUAL(pool.size(), 2);
     BOOST_CHECK_EQUAL(pool.mapWithdrawsSpentToTxid.size(), 1);
     BOOST_CHECK_EQUAL(pool.mapWithdrawsSpentToTxid[withdraw2].ToString(), tx3Hash.ToString());
 
-    setWithdrawsSpent = boost::assign::list_of(withdraw1)(withdraw3);
+    setWithdrawsSpent = {withdraw1, withdraw3};
     GetRandBytes(tx.vin[0].prevout.hash.begin(), tx.vin[0].prevout.hash.size());
     tx.vout.resize(6);
     tx.vout[5].nValue = 0;
@@ -661,11 +662,12 @@ BOOST_AUTO_TEST_CASE(WithdrawsSpentTest)
     BOOST_CHECK_EQUAL(pool.mapWithdrawsSpentToTxid[withdraw1].ToString(), tx4Hash.ToString());
     BOOST_CHECK_EQUAL(pool.mapWithdrawsSpentToTxid[withdraw3].ToString(), tx4Hash.ToString());
 
-    setWithdrawsSpent = boost::assign::list_of(withdraw2)(withdraw3);
+    setWithdrawsSpent = {withdraw2, withdraw3};
     GetRandBytes(tx.vin[0].prevout.hash.begin(), tx.vin[0].prevout.hash.size());
     tx.vout.resize(7);
     tx.vout[6].nValue = 0;
-    pool.removeForBlock(boost::assign::list_of(tx), 3, setWithdrawsSpent, conflicts);
+    txref = MakeTransactionRef(tx);
+    pool.removeForBlock({txref}, 3, setWithdrawsSpent);
 
     BOOST_CHECK_EQUAL(pool.size(), 1);
     BOOST_CHECK(pool.mapWithdrawsSpentToTxid.empty());
