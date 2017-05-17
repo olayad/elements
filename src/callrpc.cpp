@@ -76,7 +76,7 @@ static void http_error_cb(enum evhttp_request_error err, void *ctx)
 }
 #endif
 
-UniValue CallRPC(const string& strMethod, const UniValue& params, int port)
+UniValue CallRPC(const std::string& strMethod, const UniValue& params, int port)
 {
     std::string host = GetArg("-rpcconnect", DEFAULT_RPCCONNECT);
     if (port < 0)

@@ -266,8 +266,8 @@ libbitcoin_consensus_a_SOURCES = \
   arith_uint256.cpp \
   arith_uint256.h \
   bloom.cpp \
-  callrpc.cpp \
   bloom.h \
+  callrpc.cpp \
   consensus/merkle.cpp \
   consensus/merkle.h \
   consensus/params.h \
@@ -291,6 +291,7 @@ libbitcoin_consensus_a_SOURCES = \
   script/script.h \
   script/script_error.cpp \
   script/script_error.h \
+  support/events.cpp \
   serialize.h \
   tinyformat.h \
   uint256.cpp \

@@ -13,7 +13,8 @@
 #include <string>
 #include <stdexcept>
 
-#include <univalue.h>
+//#include <univalue.h>
+#include "univalue/include/univalue.h"
 
 static const bool DEFAULT_NAMED=false;
 static const char DEFAULT_RPCCONNECT[] = "127.0.0.1";
