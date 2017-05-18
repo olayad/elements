@@ -145,7 +145,7 @@ public:
 
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action) {
-        if ((nVersion & SERIALIZE_BITCOIN_BLOCK_OR_TX) || IsInBitcoinTransaction()) {
+        if ((s.GetVersion() & SERIALIZE_BITCOIN_BLOCK_OR_TX) || IsInBitcoinTransaction()) {
             CAmount nAmount = 0;
             if (!ser_action.ForRead())
                 nAmount = GetAmount();
