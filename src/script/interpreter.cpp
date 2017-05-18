@@ -1199,8 +1199,8 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
                                 // We check values by doing the following:
                                 // * Tx must relock at least <unlocked coins> - <locked-on-bitcoin coins>
                                 // * Tx must send at least the withdraw value to its P2SH withdraw, but may send more
-                                assert(locktx.vout[nlocktxOut].nValue.IsAmount()); // Its a SERIALIZE_BITCOIN_BLOCK_OR_TX
-                                CAmount withdrawVal = locktx.vout[nlocktxOut].nValue.GetAmount();
+                                assert(locktx->vout[nlocktxOut].nValue.IsAmount()); // Its a SERIALIZE_BITCOIN_BLOCK_OR_TX
+                                CAmount withdrawVal = locktx->vout[nlocktxOut].nValue.GetAmount();
                                 if (!checker.GetValueIn().IsAmount()) // Heh, you just destroyed coins
                                     return set_error(serror, SCRIPT_ERR_WITHDRAW_VERIFY_BLINDED_AMOUNTS);
 
