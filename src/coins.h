@@ -469,8 +469,8 @@ public:
      * @param[in] tx	transaction for which we are checking input total
      * @return	Sum of value of all inputs (scriptSigs)
      */
-private:
     CAmount GetValueIn(const CTransaction& tx) const;
+private:
 
 public:
     /**
