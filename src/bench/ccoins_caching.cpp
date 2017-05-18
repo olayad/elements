@@ -16,6 +16,7 @@
 // paid to a TX_PUBKEY, the second 21 and 22 CENT outputs
 // paid to a TX_PUBKEYHASH.
 //
+/*
 static std::vector<CMutableTransaction>
 SetupDummyInputs(CBasicKeyStore& keystoreRet, CCoinsViewCache& coinsRet)
 {
@@ -46,7 +47,7 @@ SetupDummyInputs(CBasicKeyStore& keystoreRet, CCoinsViewCache& coinsRet)
 
     return dummyTransactions;
 }
-
+*/
 // Microbenchmark for simple accesses to a CCoinsViewCache database. Note from
 // laanwj, "replicating the actual usage patterns of the client is hard though,
 // many times micro-benchmarks of the database showed completely different
