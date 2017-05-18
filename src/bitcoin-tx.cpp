@@ -229,10 +229,10 @@ static void MutateTxAddInput(CMutableTransaction& tx, const std::string& strInpu
         throw std::runtime_error("invalid TX input vout");
 
     // extract and validate VALUE
-    string strValue = vStrInputParts[2];
+    std::string strValue = vStrInputParts[2];
     CAmount value;
     if (!ParseMoney(strValue, value))
-        throw runtime_error("invalid TX output value");
+        throw std::runtime_error("invalid TX output value");
 
     // extract the optional sequence number
     uint32_t nSequenceIn=std::numeric_limits<unsigned int>::max();
@@ -414,13 +414,13 @@ static void MutateTxAddOutData(CMutableTransaction& tx, const std::string& strIn
     tx.nTxFee -= value;
 }
 
-static void MutateTxBlind(CMutableTransaction& tx, const string& strInput)
+static void MutateTxBlind(CMutableTransaction& tx, const std::string& strInput)
 {
     std::vector<std::string> input_blinding_factors;
     boost::split(input_blinding_factors, strInput, boost::is_any_of(":"));
 
     if (input_blinding_factors.size() != tx.vin.size())
-        throw runtime_error("One input blinding factor required per transaction input");
+        throw std::runtime_error("One input blinding factor required per transaction input");
 
     bool fBlindedIns = false;
     bool fBlindedOuts = false;
@@ -439,13 +439,13 @@ static void MutateTxBlind(CMutableTransaction& tx, const string& strInput)
     }
     for (size_t nOut = 0; nOut < tx.vout.size(); nOut++) {
         if (!tx.vout[nOut].nValue.IsAmount())
-            throw runtime_error("Invalid parameter: transaction outputs must be unblinded");
+            throw std::runtime_error("Invalid parameter: transaction outputs must be unblinded");
         if (tx.vout[nOut].nValue.vchNonceCommitment.size() == 0) {
             output_pubkeys.push_back(CPubKey());
         } else {
             CPubKey pubkey(tx.vout[nOut].nValue.vchNonceCommitment);
             if (!pubkey.IsValid()) {
-                 throw runtime_error("Invalid parameter: invalid confidentiality public key given");
+                 throw std::runtime_error("Invalid parameter: invalid confidentiality public key given");
             }
             output_pubkeys.push_back(pubkey);
             fBlindedOuts = true;
@@ -454,7 +454,7 @@ static void MutateTxBlind(CMutableTransaction& tx, const string& strInput)
     }
 
     if (fBlindedIns && !fBlindedOuts) {
-        throw runtime_error("Confidential inputs without confidential outputs");
+        throw std::runtime_error("Confidential inputs without confidential outputs");
     }
     BlindOutputs(input_blinds, output_blinds, output_pubkeys, tx);
 }
