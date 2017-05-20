@@ -559,10 +559,10 @@ void FillOutputBlinds(const CMutableTransaction& tx, bool fUseWallet, std::vecto
     }
 }
 
-UniValue rawblindrawtransaction(const UniValue& params, bool fHelp)
+UniValue rawblindrawtransaction(const JSONRPCRequest& request)
 {
-    if (fHelp || (params.size() != 2 && params.size() != 3))
-        throw runtime_error(
+    if (request.fHelp || (request.params.size() != 2 && request.params.size() != 3))
+        throw std::runtime_error(
             "rawblindrawtransaction \"hexstring\" [\"inputblinder\",...] [\"totalblinder\"]\n"
             "\nConvert one or more outputs of a raw transaction into confidential ones.\n"
             "Returns the hex-encoded raw transaction.\n"
@@ -582,13 +582,13 @@ UniValue rawblindrawtransaction(const UniValue& params, bool fHelp)
             "\"transaction\"              (string) hex string of the transaction\n"
         );
 
-    if (params.size() == 2) {
-        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VARR));
+    if (request.params.size() == 2) {
+        RPCTypeCheck(request.params, boost::assign::list_of(UniValue::VSTR)(UniValue::VARR));
     } else {
-        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VARR)(UniValue::VSTR));
+        RPCTypeCheck(request.params, boost::assign::list_of(UniValue::VSTR)(UniValue::VARR)(UniValue::VSTR));
     }
 
-    vector<unsigned char> txData(ParseHexV(params[0], "argument 1"));
+    vector<unsigned char> txData(ParseHexV(request.params[0], "argument 1"));
     CDataStream ssData(txData, SER_NETWORK, PROTOCOL_VERSION);
     CMutableTransaction tx;
     try {
@@ -597,7 +597,7 @@ UniValue rawblindrawtransaction(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
     }
 
-    UniValue inputBlinds = params[1].get_array();
+    UniValue inputBlinds = request.params[1].get_array();
 
     if (inputBlinds.size() != tx.vin.size()) throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter: one (potentially empty) input blind for each input must be provided"));
 
@@ -664,7 +664,7 @@ UniValue blindrawtransaction(const UniValue& params, bool fHelp)
         if (it == pwalletMain->mapWallet.end()) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter: transaction spends from non-wallet output"));
         }
-        if (tx.vin[nIn].prevout.n >= it->second.vout.size()) {
+        if (tx.vin[nIn].prevout.n >= it->second.tx->vout.size()) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter: transaction spends non-existing output"));
         }
         input_blinds.push_back(it->second.GetBlindingFactor(tx.vin[nIn].prevout.n));
