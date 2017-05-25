@@ -1952,7 +1952,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         return error("%s: Consensus::CheckBlock: %s", __func__, FormatStateMessage(state));
 
     // Check that all coinbase outputs pay to the required destination
-    BOOST_FOREACH(const CTxOut& txout, block.vtx[0].vout) {
+    BOOST_FOREACH(const CTxOut& txout, block.vtx[0]->vout) {
         if (chainparams.CoinbaseDestination() != CScript() && txout.scriptPubKey != chainparams.CoinbaseDestination())
             return state.DoS(100, error("ConnectBlock(): Coinbase outputs didnt match required scriptPubKey"),
                              REJECT_INVALID, "bad-coinbase-txos");
