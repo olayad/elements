@@ -4,7 +4,7 @@
 
 TESTS += test/test_beta
 bin_PROGRAMS += test/test_beta
-noinst_PROGRAMS += test/test_bitcoin_fuzzy
+noinst_PROGRAMS += test/test_beta_fuzzy
 TEST_SRCDIR = test
 TEST_BINARY=test/test_beta$(EXEEXT)
 
@@ -164,7 +164,7 @@ endif
 #
 
 # test_bitcoin_fuzzy binary #
-test_test_betan_fuzzy_SOURCES = test/test_bitcoin_fuzzy.cpp
+test_test_beta_fuzzy_SOURCES = test/test_bitcoin_fuzzy.cpp
 test_test_beta_fuzzy_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 test_test_beta_fuzzy_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 test_test_beta_fuzzy_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
