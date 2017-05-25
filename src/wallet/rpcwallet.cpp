@@ -3149,13 +3149,13 @@ CScriptID calculate_contract(const CScript& federationRedeemScript, const CBitco
     return CScriptID(scriptDestination);
 }
 
-UniValue getfundingaddress(const UniValue& params, bool fHelp)
+UniValue getfundingaddress(const JSONRPCRequest& request)
 {
-    if (!EnsureWalletIsAvailable(fHelp))
+    if (!EnsureWalletIsAvailable(request.fHelp))
         return NullUniValue;
 
-    if (fHelp || params.size() > 1)
-        throw runtime_error(
+    if (request.fHelp || request.params.size() > 1)
+        throw std::runtime_error(
             "getfundingaddress ( \"account\" )\n"
             "\nReturns information necessary to complete withdraw steps to alpha sidechain.\n"
             "The user should send coins from their Bitcoin wallet to the mainaddress returned.\n"
@@ -3173,7 +3173,7 @@ UniValue getfundingaddress(const UniValue& params, bool fHelp)
         );
 
     //Creates new address for later receipt of final funds in spendclaim
-    CBitcoinAddress address(CBitcoinAddress(getnewaddress(params, false).get_str()).GetUnblinded());
+    CBitcoinAddress address(CBitcoinAddress(getnewaddress(request).get_str()).GetUnblinded());
 
     //Call contracthashtool, get deposit address on mainchain.
     unsigned char nonce[16];
@@ -3189,12 +3189,12 @@ UniValue getfundingaddress(const UniValue& params, bool fHelp)
     return fundinginfo;
 }
 
-UniValue sendtomainchain(const UniValue& params, bool fHelp)
+UniValue sendtomainchain(const JSONRPCRequest& request)
 {
-    if (!EnsureWalletIsAvailable(fHelp))
+    if (!EnsureWalletIsAvailable(request.fHelp))
         return NullUniValue;
 
-    if (fHelp || params.size() != 2)
+    if (request.fHelp || request.params.size() != 2)
         throw runtime_error(
             "sendtomainchain address amount\n"
             "\nSends sidechain funds to the given mainchain address, through the\n"
@@ -3212,11 +3212,11 @@ UniValue sendtomainchain(const UniValue& params, bool fHelp)
 
     LOCK2(cs_main, pwalletMain->cs_wallet);
 
-    CBitcoinAddress address(params[0].get_str());
+    CBitcoinAddress address(request.params[0].get_str());
     if (!address.IsValid())
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Bitcoin address");
 
-    CAmount nAmount = AmountFromValue(params[1]);
+    CAmount nAmount = AmountFromValue(request.params[1]);
     if (nAmount <= 0)
         throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for send");
 
@@ -3261,13 +3261,13 @@ UniValue sendtomainchain(const UniValue& params, bool fHelp)
     return wtxNew.GetHash().GetHex();
 }
 
-extern UniValue sendrawtransaction(const UniValue& params, bool fHelp);
+extern UniValue sendrawtransaction(const JSONRPCRequest& request);
 
-UniValue claimwithdraw(const UniValue& params, bool fHelp)
+UniValue claimwithdraw(const JSONRPCRequest& request)
 {
 
-    if (fHelp || params.size() != 4)
-        throw runtime_error(
+    if (request.fHelp || request.params.size() != 4)
+        throw std::runtime_error(
             "claimwithdraw sidechainaddress nonce bitcoinTx txoutproof\n"
             "\nClaim coins from the main chain by creating a withdraw transaction with the necessary metadata after the corresponding Bitcoin transaction.\n"
             "Note that the transaction will not be mined or relayed unless it is buried at least 10 blocks deep.\n"
@@ -3285,23 +3285,24 @@ UniValue claimwithdraw(const UniValue& params, bool fHelp)
             + HelpExampleRpc("claimwithdraw", "\"2NEqRzqBst5rWrVx7SpwG37T17mvehLhKaN\", \"eb00b5dc3afc67beee5bfdfd79665283\", \"d50c8eec366e98b258414509d88e72ed0d2b24f63256e076d2b9d0ac3d55abc1\"")
         );
 
-    CBitcoinAddress sidechainAddress(params[0].get_str());
+    CBitcoinAddress sidechainAddress(request.params[0].get_str());
     if (!sidechainAddress.IsValid())
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid sidechainaddress");
 
-    if (!IsHex(params[1].get_str()) || !IsHex(params[2].get_str()) || !IsHex(params[3].get_str()))
+    if (!IsHex(request.params[1].get_str()) || !IsHex(request.params[2].get_str()) || !IsHex(request.params[3].get_str()))
         throw JSONRPCError(RPC_TYPE_ERROR, "the last three arguments must be hex strings");
 
-    std::vector<unsigned char> txData = ParseHex(params[2].get_str());
+    std::vector<unsigned char> txData = ParseHex(request.params[2].get_str());
     CDataStream ssTx(txData, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_BITCOIN_BLOCK_OR_TX);
-    CTransaction txBTC;
-    ssTx >> txBTC;
+    CTransactionRef txBTCRef;
+    ssTx >> txBTCRef;
+    CTransaction txBTC(*txBTCRef);
 
-    std::vector<unsigned char> txOutProofData = ParseHex(params[3].get_str());
+    std::vector<unsigned char> txOutProofData = ParseHex(request.params[3].get_str());
     CDataStream ssTxOutProof(txOutProofData, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_BITCOIN_BLOCK_OR_TX);
     CMerkleBlock merkleBlock;
     ssTxOutProof >> merkleBlock;
-    if (!ssTxOutProof.empty() || !CheckBitcoinProof(merkleBlock.header))
+    if (!ssTxOutProof.empty() || !CheckBitcoinProof(merkleBlock.header.GetHash(), merkleBlock.header.bitcoinproof.challenge))
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx out proof");
 
     vector<uint256> txHashes;
@@ -3312,9 +3313,9 @@ UniValue claimwithdraw(const UniValue& params, bool fHelp)
     if (txHashes.size() != 1 || txHashes[0] != txBTC.GetHash())
         throw JSONRPCError(RPC_INVALID_PARAMETER, "The txoutproof must contain bitcoinTx and only bitcoinTx");
 
-    if (!IsHex(params[1].get_str()) || params[1].get_str().length() != 16*2)
+    if (!IsHex(request.params[1].get_str()) || request.params[1].get_str().length() != 16*2)
         throw JSONRPCError(RPC_TYPE_ERROR, "nonce must be a 32-byte hex string");
-    std::vector<unsigned char> nonce = ParseHex(params[1].get_str());
+    std::vector<unsigned char> nonce = ParseHex(request.params[1].get_str());
 
     //Call contracthashtool
     unsigned char fullcontract[40];
@@ -3351,9 +3352,14 @@ UniValue claimwithdraw(const UniValue& params, bool fHelp)
 
         CValidationState state;
         bool fMissingInputs;
-        if (!AcceptToMemoryPool(mempool, state, mtxn, false, &fMissingInputs, false, true))
+        if (!AcceptToMemoryPool(mempool, state, MakeTransactionRef(mtxn), false, &fMissingInputs, NULL, false, true))
             throw JSONRPCError(RPC_TRANSACTION_REJECTED, strprintf("Failed to merge locked outputs, please try again later (%i: %s)", state.GetRejectCode(), state.GetRejectReason()));
-        RelayTransaction(mtxn);
+
+		CInv inv(MSG_TX, mtxn.GetHash());
+		g_connman->ForEachNode([&inv](CNode* pnode)
+		{
+			pnode->PushInventory(inv);
+		});
 
         lockedUTXO.erase(lockedUTXO.begin(), lockedUTXO.begin() + 2);
         lockedUTXO.push_back(std::make_pair(COutPoint(mtxn.GetHash(), 0), out_value));
@@ -3384,11 +3390,32 @@ UniValue claimwithdraw(const UniValue& params, bool fHelp)
 
     //No signing needed, just send
     CTransaction finalTxn(mtxn);
-    UniValue signedTxnArray(UniValue::VARR);
-    signedTxnArray.push_back(EncodeHexTx(finalTxn));
-    return sendrawtransaction(signedTxnArray, false);
+
+	CValidationState state;
+	bool fMissingInputs;
+	if (!AcceptToMemoryPool(mempool, state, MakeTransactionRef(finalTxn), false, &fMissingInputs, NULL, false, true))
+		throw JSONRPCError(RPC_TRANSACTION_REJECTED, strprintf("Failed to merge locked outputs, please try again later (%i: %s)", state.GetRejectCode(), state.GetRejectReason()));
+
+	CInv inv(MSG_TX, finalTxn.GetHash());
+	g_connman->ForEachNode([&inv](CNode* pnode)
+	{
+		pnode->PushInventory(inv);
+	});
+
+    return finalTxn.GetHash().GetHex();
 }
 
+extern UniValue dumpprivkey(const JSONRPCRequest& request); // in rpcdump.cpp
+extern UniValue importprivkey(const JSONRPCRequest& request);
+extern UniValue importaddress(const JSONRPCRequest& request);
+extern UniValue importpubkey(const JSONRPCRequest& request);
+extern UniValue dumpwallet(const JSONRPCRequest& request);
+extern UniValue importwallet(const JSONRPCRequest& request);
+extern UniValue importprunedfunds(const JSONRPCRequest& request);
+extern UniValue removeprunedfunds(const JSONRPCRequest& request);
+extern UniValue importmulti(const JSONRPCRequest& request);
+extern UniValue dumpblindingkey(const JSONRPCRequest& request);
+extern UniValue importblindingkey(const JSONRPCRequest& request);
 
 static const CRPCCommand commands[] =
 { //  category              name                        actor (function)           okSafeMode
