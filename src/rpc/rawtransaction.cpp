@@ -1119,12 +1119,12 @@ UniValue sendrawtransaction(const JSONRPCRequest& request)
         nMaxRawTxFee = 0;
 
     bool fOverrideBlindable = false;
-    if (params.size() > 2)
-        fOverrideBlindable = params[2].get_bool();
+    if (request.params.size() > 2)
+        fOverrideBlindable = request.params[2].get_bool();
 
     if (!fOverrideBlindable) {
-        for (unsigned i = 0; i < tx.vout.size(); i++) {
-            const CTxOut& txout = tx.vout[i];
+        for (unsigned i = 0; i < tx->vout.size(); i++) {
+            const CTxOut& txout = tx->vout[i];
             if (txout.nValue.IsAmount() && txout.nValue.vchNonceCommitment.size() != 0)
                 throw JSONRPCError(RPC_TRANSACTION_ERROR, strprintf("Output %u is unblinded, but has blinding pubkey attached, please use [raw]blindrawtransaction", i));
         }
