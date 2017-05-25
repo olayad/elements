@@ -1462,6 +1462,7 @@ void CWalletTx::GetAmounts(list<COutputEntry>& listReceived,
     // Sent/received.
     for (unsigned int i = 0; i < tx->vout.size(); ++i)
     {
+        const CTxOut& txout = tx->vout[i];
         CAmount nValueOut = GetValueOut(i);
 
         if (nValueOut >= 0) {
