@@ -621,9 +621,9 @@ UniValue rawblindrawtransaction(const JSONRPCRequest& request)
 }
 
 #ifdef ENABLE_WALLET
-UniValue blindrawtransaction(const UniValue& params, bool fHelp)
+UniValue blindrawtransaction(const JSONRPCRequest& request)
 {
-    if (fHelp || (params.size() != 1 && params.size() != 2))
+    if (request.fHelp || (request.params.size() != 1 && request.params.size() != 2))
         throw runtime_error(
             "blindrawtransaction \"hexstring\" [\"totalblinder\"]\n"
             "\nConvert one or more outputs of a raw transaction into confidential ones using only wallet inputs.\n"
@@ -639,13 +639,13 @@ UniValue blindrawtransaction(const UniValue& params, bool fHelp)
             "\"transaction\"              (string) hex string of the transaction\n"
         );
 
-    if (params.size() == 1) {
-        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR));
+    if (request.params.size() == 1) {
+        RPCTypeCheck(request.params, boost::assign::list_of(UniValue::VSTR));
     } else {
-        RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR));
+        RPCTypeCheck(request.params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR));
     }
 
-    vector<unsigned char> txData(ParseHexV(params[0], "argument 1"));
+    vector<unsigned char> txData(ParseHexV(request.params[0], "argument 1"));
     CDataStream ssData(txData, SER_NETWORK, PROTOCOL_VERSION);
     CMutableTransaction tx;
     try {
@@ -1154,8 +1154,8 @@ static const CRPCCommand commands[] =
     { "rawtransactions",    "decodescript",           &decodescript,           true,  {"hexstring"} },
     { "rawtransactions",    "sendrawtransaction",     &sendrawtransaction,     false, {"hexstring","allowhighfees"} },
     { "rawtransactions",    "signrawtransaction",     &signrawtransaction,     false, {"hexstring","prevtxs","privkeys","sighashtype"} }, /* uses wallet if enabled */
-    { "rawtransactions",    "rawblindrawtransaction", &rawblindrawtransaction, false },
-    { "rawtransactions",    "blindrawtransaction",    &blindrawtransaction,    true  },
+    { "rawtransactions",    "rawblindrawtransaction", &rawblindrawtransaction, false, {}},
+    { "rawtransactions",    "blindrawtransaction",    &blindrawtransaction,    true, {}},
 
     { "blockchain",         "gettxoutproof",          &gettxoutproof,          true,  {"txids", "blockhash"} },
     { "blockchain",         "verifytxoutproof",       &verifytxoutproof,       true,  {"proof"} },

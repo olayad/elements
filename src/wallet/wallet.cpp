@@ -1311,7 +1311,7 @@ bool CWallet::IsAllFromMe(const CTransaction& tx, const isminefilter& filter) co
 CAmount CWallet::GetCredit(const CWalletTx& tx, const isminefilter& filter) const
 {
     CAmount nCredit = 0;
-    for (unsigned int i = 0; i < tx.vout.size(); i++)
+    for (unsigned int i = 0; i < tx.tx->vout.size(); i++)
     {
         nCredit += tx.GetCredit(i, filter);
         if (!MoneyRange(nCredit))
@@ -1323,7 +1323,7 @@ CAmount CWallet::GetCredit(const CWalletTx& tx, const isminefilter& filter) cons
 CAmount CWallet::GetChange(const CWalletTx& tx) const
 {
     CAmount nChange = 0;
-    for (unsigned int i = 0; i < tx.vout.size(); i++)
+    for (unsigned int i = 0; i < tx.tx->vout.size(); i++)
     {
         nChange += tx.GetChange(i);
         if (!MoneyRange(nChange))
@@ -1688,7 +1688,7 @@ CAmount CWalletTx::GetDebit(const isminefilter& filter) const
 CAmount CWalletTx::GetCredit(unsigned int nTxOut, const isminefilter& filter) const
 {
     CAmount amount = 0;
-    if (pwallet->IsMine(vout[nTxOut]) & filter)
+    if (pwallet->IsMine(tx->vout[nTxOut]) & filter)
         amount = GetValueOut(nTxOut);
     // Can be -1 if someone sent us a transaction using a wrong scanning key:
     if (amount == -1)
@@ -1819,7 +1819,7 @@ CAmount CWalletTx::GetAvailableWatchOnlyCredit(const bool& fUseCache) const
 CAmount CWalletTx::GetChange(unsigned int nTxOut) const
 {
     CAmount amount = 0;
-    if (pwallet->IsChange(vout[nTxOut]))
+    if (pwallet->IsChange(tx->vout[nTxOut]))
         amount = GetValueOut(nTxOut);
     if (!MoneyRange(amount))
         throw std::runtime_error("CWallet::GetChange(): value out of range");
@@ -1895,9 +1895,9 @@ void CWalletTx::GetBlindingData(unsigned int nOut, CAmount* pamountOut, CPubKey*
     // * 33 bytes blinding pubkey (ECDH pubkey of the destination)
     // This is really ugly, and should use CDataStream serialization instead.
 
-    assert(nOut < vout.size());
+    assert(nOut < tx->vout.size());
     if (mapValue["blindingdata"].size() < (nOut + 1) * 74) {
-        mapValue["blindingdata"].resize(vout.size() * 74);
+        mapValue["blindingdata"].resize(tx->vout.size() * 74);
     }
 
     unsigned char* it = (unsigned char*)(&mapValue["blindingdata"][0]) + 74 * nOut;
@@ -1911,7 +1911,7 @@ void CWalletTx::GetBlindingData(unsigned int nOut, CAmount* pamountOut, CPubKey*
         memcpy(blindingfactor.begin(), &*(it + 9), 32);
         pubkey.Set(it + 41, it + 74);
     } else {
-        pwallet->ComputeBlindingData(vout[nOut], amount, pubkey, blindingfactor);
+        pwallet->ComputeBlindingData(tx->vout[nOut], amount, pubkey, blindingfactor);
         *it = 1;
         memcpy(&*(it + 1), &amount, 8);
         memcpy(&*(it + 9), blindingfactor.begin(), 32);
@@ -2578,7 +2578,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                 bool fBlindedIns = false;
                 BOOST_FOREACH(PAIRTYPE(const CWalletTx*, unsigned int) pcoin, setCoins)
                 {
-                    if (!pcoin.first->vout[pcoin.second].nValue.IsAmount())
+                    if (!pcoin.first->tx->vout[pcoin.second].nValue.IsAmount())
                         fBlindedIns = true;
                     CAmount nCredit = pcoin.first->GetValueOut(pcoin.second);
                     //The coin age after the next block (depth+1) is used instead of the current,

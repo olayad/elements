@@ -598,8 +598,8 @@ UniValue getreceivedbyaddress(const JSONRPCRequest& request)
             continue;
 
 
-        for (unsigned int i = 0; i < wtx.vout.size(); i++)
-            if (wtx.vout[i].scriptPubKey == scriptPubKey)
+        for (unsigned int i = 0; i < wtx.tx->vout.size(); i++)
+            if (wtx.tx->vout[i].scriptPubKey == scriptPubKey)
                 if (wtx.GetDepthInMainChain() >= nMinDepth)
                     nAmount += wtx.GetValueOut(i);
     }
@@ -652,10 +652,10 @@ UniValue getreceivedbyaccount(const JSONRPCRequest& request)
         if (wtx.IsCoinBase() || !CheckFinalTx(*wtx.tx))
             continue;
 
-        for (unsigned int i = 0; i < wtx.vout.size(); i++)
+        for (unsigned int i = 0; i < wtx.tx->vout.size(); i++)
         {
             CTxDestination address;
-            if (ExtractDestination(wtx.vout[i].scriptPubKey, address) && IsMine(*pwalletMain, address) && setAddress.count(address))
+            if (ExtractDestination(wtx.tx->vout[i].scriptPubKey, address) && IsMine(*pwalletMain, address) && setAddress.count(address))
                 if (wtx.GetDepthInMainChain() >= nMinDepth)
                     nAmount += wtx.GetValueOut(i);
         }
@@ -1196,10 +1196,10 @@ UniValue ListReceived(const UniValue& params, bool fByAccounts)
         if (nDepth < nMinDepth)
             continue;
 
-        for (unsigned int i = 0; i < wtx.vout.size(); i++)
+        for (unsigned int i = 0; i < wtx.tx->vout.size(); i++)
         {
             CTxDestination address;
-            if (!ExtractDestination(wtx.vout[i].scriptPubKey, address))
+            if (!ExtractDestination(wtx.tx->vout[i].scriptPubKey, address))
                 continue;
 
             isminefilter mine = IsMine(*pwalletMain, address);
@@ -1207,7 +1207,7 @@ UniValue ListReceived(const UniValue& params, bool fByAccounts)
                 continue;
 
             CBitcoinAddress bitcoinaddress(address);
-            if (!wtx.vout[i].nValue.IsAmount())
+            if (!wtx.tx->vout[i].nValue.IsAmount())
                 bitcoinaddress.AddBlindingKey(wtx.GetBlindingKey(i));
 
             tallyitem& item = mapTally[address];
