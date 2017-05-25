@@ -1620,7 +1620,7 @@ bool AppInitMain(boost::thread_group& threadGroup, CScheduler& scheduler)
     CBlockIndex *genesis = chainActive.Genesis();
     const CBlock &genesisBlock = Params().GenesisBlock();
     for (unsigned int i = 0; i<genesis->nTx ; i++) {
-        SyncWithWallets(genesisBlock.vtx[i], genesis, &genesisBlock);
+        GetMainSignals().SyncTransaction(*(genesisBlock.vtx[i]), genesis, (int)i);
     }
 
     // ********************************************************* Step 11: start node
