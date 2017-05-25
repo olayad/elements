@@ -60,7 +60,7 @@ BOOST_AUTO_TEST_CASE(rpc_rawparams)
     BOOST_CHECK_THROW(CallRPC("decoderawtransaction"), std::runtime_error);
     BOOST_CHECK_THROW(CallRPC("decoderawtransaction null"), std::runtime_error);
     BOOST_CHECK_THROW(CallRPC("decoderawtransaction DEADBEEF"), std::runtime_error);
-    string rawtx = "01000000000000000000000000000002000000000000000000000000000000000000000000000000000000000005f5e10000210336cf214cb1633268d90ef794165de68911661210cb82e61276639b10911e71361976a914261324748d65eaf0fa3e22b1bd79f2f487c9d98188ac00000000000000000000000000000000000000000000000000000000000bebc200002102248846a76f455da4b3d6ca78a021aabcca7e22e9abd5c9813fb27155dd2739871976a91457a463ab039b40e9457abaff84a9bdd39c9caf0088ac69000000";
+    std::string rawtx = "01000000000000000000000000000002000000000000000000000000000000000000000000000000000000000005f5e10000210336cf214cb1633268d90ef794165de68911661210cb82e61276639b10911e71361976a914261324748d65eaf0fa3e22b1bd79f2f487c9d98188ac00000000000000000000000000000000000000000000000000000000000bebc200002102248846a76f455da4b3d6ca78a021aabcca7e22e9abd5c9813fb27155dd2739871976a91457a463ab039b40e9457abaff84a9bdd39c9caf0088ac69000000";
     BOOST_CHECK_NO_THROW(r = CallRPC(std::string("decoderawtransaction ")+rawtx));
     BOOST_CHECK_EQUAL(find_value(r.get_obj(), "size").get_int(), 208);
     BOOST_CHECK_EQUAL(find_value(r.get_obj(), "version").get_int(), 1);
@@ -79,7 +79,7 @@ BOOST_AUTO_TEST_CASE(rpc_rawparams)
     BOOST_CHECK_THROW(CallRPC("sendrawtransaction"), std::runtime_error);
     BOOST_CHECK_THROW(CallRPC("sendrawtransaction null"), std::runtime_error);
     BOOST_CHECK_THROW(CallRPC("sendrawtransaction DEADBEEF"), std::runtime_error);
-    BOOST_CHECK_THROW(CallRPC(string("sendrawtransaction ")+rawtx+" extra"), runtime_error);
+    BOOST_CHECK_THROW(CallRPC(std::string("sendrawtransaction ")+rawtx+" extra"), std::runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(rpc_togglenetwork)
