@@ -98,7 +98,7 @@ UniValue getnetworkhashps(const JSONRPCRequest& request)
 
 UniValue generate(const JSONRPCRequest& request)
 {
-    if (fHelp || params.size() < 1 || params.size() > 1)
+    if (request.fHelp || request.params.size() < 1 || request.params.size() > 1)
         throw runtime_error(
             "generate numblocks\n"
             "\nMine blocks immediately (before the RPC call returns)\n"
@@ -114,12 +114,10 @@ UniValue generate(const JSONRPCRequest& request)
 
     LOCK(cs_main);
 
-    CScript coinbaseDest(Params().CoinbaseDestination());
-    if (coinbaseDest == CScript())
-        coinbaseDest = CScript() << OP_TRUE;
+    CScript coinbaseDest(CScript() << OP_TRUE);
 
     UniValue arr(UniValue::VARR);
-    for (int i = 0; i < params[0].get_int(); i++) {
+    for (int i = 0; i < request.params[0].get_int(); i++) {
         std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler(Params()).CreateNewBlock(coinbaseDest));
         if (!pblocktemplate.get())
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Wallet keypool empty");
@@ -127,9 +125,9 @@ UniValue generate(const JSONRPCRequest& request)
         IncrementExtraNonce(&pblocktemplate->block, chainActive.Tip(), nExtraNonce);
         if (!CheckProof(pblocktemplate->block, Params().GetConsensus()))
             throw JSONRPCError(RPC_METHOD_NOT_FOUND, "This method cannot be used with a block-signature-required chain");
-        CValidationState state;
-        assert(ProcessNewBlock(state, Params(), NULL, &pblocktemplate->block, true, NULL));
-        assert(state.IsValid() && chainActive.Tip()->GetBlockHash() == pblocktemplate->block.GetHash());
+        std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(pblocktemplate->block);
+        assert(ProcessNewBlock(Params(), shared_pblock, true, NULL));
+        assert(chainActive.Tip()->GetBlockHash() == pblocktemplate->block.GetHash());
         arr.push_back(pblocktemplate->block.GetHash().ToString());
     }
     return arr;
