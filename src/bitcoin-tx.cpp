@@ -709,44 +709,45 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& flagStr)
     tx = mergedTx;
 }
 
-static void MutateTxPeginSign(CMutableTransaction& tx, const string& flagStr)
+static void MutateTxPeginSign(CMutableTransaction& tx, const std::string& flagStr)
 {
     if (!registers.count("peginkeys"))
-        throw runtime_error("peginkeys register variable must be set.");
+        throw std::runtime_error("peginkeys register variable must be set.");
     UniValue keysObj = registers["peginkeys"];
 
     if (!keysObj.isObject())
-        throw runtime_error("peginkeysObjs must be an object");
-    map<string,UniValue::VType> types = boost::assign::map_list_of("contract",UniValue::VSTR)("txoutproof",UniValue::VSTR)("tx",UniValue::VSTR)("nout",UniValue::VNUM);
+        throw std::runtime_error("peginkeysObjs must be an object");
+    std::map<std::string,UniValue::VType> types = boost::assign::map_list_of("contract",UniValue::VSTR)("txoutproof",UniValue::VSTR)("tx",UniValue::VSTR)("nout",UniValue::VNUM);
     if (!keysObj.checkObject(types))
-        throw runtime_error("peginkeysObjs internal object typecheck fail");
+        throw std::runtime_error("peginkeysObjs internal object typecheck fail");
 
-    vector<unsigned char> contractData(ParseHexUV(keysObj["contract"], "contract"));
-    vector<unsigned char> txoutproofData(ParseHexUV(keysObj["txoutproof"], "txoutproof"));
-    vector<unsigned char> txData(ParseHexUV(keysObj["tx"], "tx"));
+    std::vector<unsigned char> contractData(ParseHexUV(keysObj["contract"], "contract"));
+    std::vector<unsigned char> txoutproofData(ParseHexUV(keysObj["txoutproof"], "txoutproof"));
+    std::vector<unsigned char> txData(ParseHexUV(keysObj["tx"], "tx"));
     int nOut = atoi(keysObj["nout"].getValStr());
 
     if (contractData.size() != 40)
-        throw runtime_error("contract must be 40 bytes");
+        throw std::runtime_error("contract must be 40 bytes");
 
     CDataStream ssProof(txoutproofData,SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_BITCOIN_BLOCK_OR_TX);
     CMerkleBlock merkleBlock;
     ssProof >> merkleBlock;
 
     CDataStream ssTx(txData, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_BITCOIN_BLOCK_OR_TX);
-    CTransaction txBTC;
-    ssTx >> txBTC;
+    CTransactionRef txBTCRef;
+    ssTx >> txBTCRef;
+    CTransaction txBTC(*txBTCRef);
 
-    vector<uint256> transactionHashes;
-    vector<unsigned int> transactionIndices;
-    if (!CheckBitcoinProof(merkleBlock.header) ||
+    std::vector<uint256> transactionHashes;
+    std::vector<unsigned int> transactionIndices;
+    if (!CheckBitcoinProof(merkleBlock.header.GetHash(), merkleBlock.header.bitcoinproof.challenge) ||
             merkleBlock.txn.ExtractMatches(transactionHashes, transactionIndices) != merkleBlock.header.hashMerkleRoot ||
             transactionHashes.size() != 1 ||
             transactionHashes[0] != txBTC.GetHash())
-        throw runtime_error("txoutproof is invalid or did not match tx");
+        throw std::runtime_error("txoutproof is invalid or did not match tx");
 
     if (nOut < 0 || (unsigned int) nOut >= txBTC.vout.size())
-        throw runtime_error("nout must be >= 0, < txout count");
+        throw std::runtime_error("nout must be >= 0, < txout count");
 
     CScript scriptSig;
     scriptSig << contractData;
