@@ -3433,7 +3433,7 @@ static const CRPCCommand commands[] =
     { "wallet",             "dumpprivkey",              &dumpprivkey,              true,   {"address"}  },
     { "wallet",             "dumpwallet",               &dumpwallet,               true,   {"filename"} },
     { "wallet",             "encryptwallet",            &encryptwallet,            true,   {"passphrase"} },
-    { "wallet",             "claimpegin",               &claimwpegin,              false,   {} },
+    { "wallet",             "claimpegin",               &claimpegin,               false,  {} },
     { "wallet",             "getaccountaddress",        &getaccountaddress,        true,   {"account"} },
     { "wallet",             "getaccount",               &getaccount,               true,   {"address"} },
     { "wallet",             "getaddressesbyaccount",    &getaddressesbyaccount,    true,   {"account"} },
