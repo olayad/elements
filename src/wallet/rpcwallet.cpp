@@ -3285,7 +3285,7 @@ UniValue claimpegin(const JSONRPCRequest& request)
     if (!sidechainAddress.IsValid())
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid sidechainaddress");
 
-    if (!IsHex(request.params[1].get_str()) || !IsHex(request.params[2].get_str())))
+    if (!IsHex(request.params[1].get_str()) || !IsHex(request.params[2].get_str()))
         throw JSONRPCError(RPC_TYPE_ERROR, "the last two arguments must be hex strings");
 
     std::vector<unsigned char> txData = ParseHex(request.params[2].get_str());
