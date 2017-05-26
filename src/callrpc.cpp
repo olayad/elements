@@ -89,7 +89,7 @@ UniValue CallRPC(const std::string& strMethod, const UniValue& params, int port,
         struser = "-mainchainrpcuser";
     }
 
-    std::string host = GetArg(strhost, DEFAULT_RPCHOST);
+    std::string host = GetArg(strhost, DEFAULT_RPCCONNECT);
     if (port < 0)
         port = GetArg(strport, BaseParams().RPCPort());
 
@@ -116,11 +116,12 @@ UniValue CallRPC(const std::string& strMethod, const UniValue& params, int port,
         if (!connectToMainchain && !GetAuthCookie(&strRPCUserColonPass)) {
             throw std::runtime_error(strprintf(
                 _("Could not locate RPC credentials. No authentication cookie could be found, and no rpcpassword is set in the configuration file (%s)"),
-                    GetConfigFile().string().c_str()));
+                    GetConfigFile(GetArg("-conf", BITCOIN_CONF_FILENAME)).string().c_str()));
         }
 
         // Try fall back to cookie-based authentication if no password is provided
         if (connectToMainchain && !GetMainchainAuthCookie(&strRPCUserColonPass)) {
+            throw std::runtime_error(strprintf(
                 _("Could not locate RPC credentials. No authentication cookie could be found, and no rpcpassword is set in the configuration file (%s)"),
                     GetConfigFile(GetArg("-conf", BITCOIN_CONF_FILENAME)).string().c_str()));
 
