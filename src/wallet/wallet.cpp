@@ -1914,9 +1914,9 @@ bool CWalletTx::IsEquivalentTo(const CWalletTx& _tx) const
 
 void CWalletTx::SetBlindingData(unsigned int nOut, CAmount amountIn, CPubKey pubkeyIn, uint256 blindingfactorIn) const
 {
-    assert(nOut < vout.size());
+    assert(nOut < tx->vout.size());
     if (mapValue["blindingdata"].size() < (nOut + 1) * 74) {
-        mapValue["blindingdata"].resize(vout.size() * 74);
+        mapValue["blindingdata"].resize(tx->vout.size() * 74);
     }
 
     unsigned char* it = (unsigned char*)(&mapValue["blindingdata"][0]) + 74 * nOut;
