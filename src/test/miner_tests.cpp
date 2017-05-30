@@ -191,6 +191,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
 {
     //TODO: Fix how thouroughly this relies on a 50BTC subsidy
     return;
+    /*
     // Note that by default, these tests run with size accounting enabled.
     const auto chainParams = CreateChainParams(CBaseChainParams::MAIN);
     const CChainParams& chainparams = *chainParams;
