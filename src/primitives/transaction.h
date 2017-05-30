@@ -326,6 +326,8 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
     s >> tx.nVersion;
     if (!fIsBitcoinTx) {
         s >> tx.nTxFee;
+    } else {
+        tx.nTxFee = -42;
     }
     unsigned char flags = 0;
     tx.vin.clear();
@@ -375,9 +377,13 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
 template<typename Stream, typename TxType>
 inline void SerializeTransaction(const TxType& tx, Stream& s) {
     const bool fAllowWitness = !(s.GetVersion() & SERIALIZE_TRANSACTION_NO_WITNESS);
+    const bool fIsBitcoinTx = (s.GetVersion() & SERIALIZE_BITCOIN_BLOCK_OR_TX);
 
     s << tx.nVersion;
-    s << tx.nTxFee;
+    if (!fIsBitcoinTx) {
+        s << tx.nTxFee;
+    }
+
     unsigned char flags = 0;
     // Consistency check
     if (fAllowWitness) {
