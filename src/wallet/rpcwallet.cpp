@@ -450,7 +450,7 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
 
     SendMoney(address.Get(), nAmount, fSubtractFeeFromAmount, confidentiality_pubkey, wtx);
 
-    AuditLogPrintf("%s : sendtoaddress %s %s txid:%s\n", getUser(), params[0].get_str(), params[1].getValStr(), wtx.GetHash().GetHex());
+    AuditLogPrintf("%s : sendtoaddress %s %s txid:%s\n", getUser(), request.params[0].get_str(), request.params[1].getValStr(), wtx.GetHash().GetHex());
 
     return wtx.GetHash().GetHex();
 }
@@ -899,7 +899,7 @@ UniValue sendfrom(const JSONRPCRequest& request)
 
     SendMoney(address.Get(), nAmount, false, confidentiality_pubkey, wtx);
 
-    AuditLogPrintf("%s : sendfrom %s %s %s txid:%s\n", getUser(), params[0].get_str(), params[1].get_str(), params[2].getValStr(), wtx.GetHash().GetHex());
+    AuditLogPrintf("%s : sendfrom %s %s %s txid:%s\n", getUser(), request.params[0].get_str(), request.params[1].get_str(), request.params[2].getValStr(), wtx.GetHash().GetHex());
 
     return wtx.GetHash().GetHex();
 }
@@ -2380,7 +2380,7 @@ UniValue settxfee(const JSONRPCRequest& request)
 
     payTxFee = CFeeRate(nAmount, 1000);
 
-    AuditLogPrintf("%s : settxfee %s\n", getUser(), params[0].getValStr());
+    AuditLogPrintf("%s : settxfee %s\n", getUser(), request.params[0].getValStr());
 
     return true;
 }
@@ -3284,7 +3284,7 @@ UniValue sendtomainchain(const JSONRPCRequest& request)
     CWalletTx wtxNew;
     SendMoney(scriptPubKey, nAmount, false, CPubKey(), wtxNew);
 
-    AuditLogPrintf("%s : sendtomainchain %s\n", getUser(), wtxNew.ToString());
+    AuditLogPrintf("%s : sendtomainchain %s\n", getUser(), wtxNew.tx->GetHash().GetHex());
 
     return wtxNew.GetHash().GetHex();
 }

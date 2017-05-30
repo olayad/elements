@@ -254,7 +254,7 @@ UniValue importaddress(const JSONRPCRequest& request)
         pwalletMain->ReacceptWalletTransactions();
     }
 
-    AuditLogPrintf("%s : importaddress %s\n", getUser(), params[0].get_str());
+    AuditLogPrintf("%s : importaddress %s\n", getUser(), request.params[0].get_str());
 
     return NullUniValue;
 }
@@ -408,7 +408,7 @@ UniValue importpubkey(const JSONRPCRequest& request)
         pwalletMain->ReacceptWalletTransactions();
     }
 
-    AuditLogPrintf("%s : importpubkey %s\n", getUser(), params[0].get_str());
+    AuditLogPrintf("%s : importpubkey %s\n", getUser(), request.params[0].get_str());
 
     return NullUniValue;
 }
@@ -517,7 +517,7 @@ UniValue importwallet(const JSONRPCRequest& request)
     if (!fGood)
         throw JSONRPCError(RPC_WALLET_ERROR, "Error adding some keys to wallet");
 
-    AuditLogPrintf("%s : importwallet %s\n", getUser(), params[0].get_str());
+    AuditLogPrintf("%s : importwallet %s\n", getUser(), request.params[0].get_str());
 
     return NullUniValue;
 }
@@ -651,7 +651,7 @@ UniValue dumpwallet(const JSONRPCRequest& request)
     file << "# End of dump\n";
     file.close();
 
-    AuditLogPrintf("%s : dumpwallet %s\n", getUser(), params[0].get_str());
+    AuditLogPrintf("%s : dumpwallet %s\n", getUser(), request.params[0].get_str());
 
     return NullUniValue;
 }
