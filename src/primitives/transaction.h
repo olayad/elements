@@ -282,8 +282,8 @@ public:
     }
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-        if (!(nVersion & SERIALIZE_BITCOIN_BLOCK_OR_TX)) {
+    inline void SerializationOp(Stream& s, Operation ser_action) {
+        if (!(s.GetVersion() & SERIALIZE_BITCOIN_BLOCK_OR_TX)) {
             READWRITE(ref.nValue.vchRangeproof);
             READWRITE(ref.nValue.vchNonceCommitment);
         }
@@ -358,7 +358,7 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
         bool fHadOutputWitness = false;
         for (size_t i = 0; i < tx.vout.size(); i++) {
             CTxOutWitnessSerializer witser(REF(tx.vout[i]));
-            READWRITE(witser);
+            s >> witser;
             if (!witser.IsNull()) {
                 fHadOutputWitness = true;
             }
@@ -415,7 +415,7 @@ inline void SerializeTransaction(const TxType& tx, Stream& s) {
         if (flags & 2) {
             for (size_t i = 0; i < tx.vout.size(); i++) {
                 CTxOutWitnessSerializer witser(*const_cast<CTxOut*>(&tx.vout[i]));
-                READWRITE(witser);
+               s << witser;
             }
         }
     }
