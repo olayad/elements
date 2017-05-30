@@ -1771,7 +1771,7 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
 }
 }// namespace Consensus
 
-bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsViewCache &inputs, bool fScriptChecks, unsigned int flags, bool cacheStore, PrecomputedTransactionData& txdata, std::set<std::pair<uint256, COutPoint> >& setWithdrawsSpent, std::vector<CCheck> *pvChecks)
+bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsViewCache &inputs, bool fScriptChecks, unsigned int flags, bool cacheStore, PrecomputedTransactionData& txdata, std::set<std::pair<uint256, COutPoint> >& setWithdrawsSpent, std::vector<CCheck*> *pvChecks)
 {
     if (!tx.IsCoinBase())
     {
