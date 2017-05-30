@@ -103,7 +103,7 @@ void WalletTxToJSON(const CWalletTx& wtx, UniValue& entry)
     }
     entry.push_back(Pair("bip125-replaceable", rbfStatus));
     std::string blindfactors;
-    for (unsigned int i=0; i<wtx.vout.size(); i++)
+    for (unsigned int i=0; i<wtx.tx->vout.size(); i++)
         blindfactors += wtx.GetBlindingFactor(i).GetHex() + ":";
     entry.push_back(Pair("blindingfactors", blindfactors));
 }
