@@ -122,10 +122,7 @@ bool CachingRangeProofChecker::VerifyRangeProof(const std::vector<unsigned char>
     uint256 entry;
     rangeProofCache.ComputeEntry(entry, uint256(), vchRangeProof, pubkey);
 
-    if (rangeProofCache.Get(entry)) {
-        if (!store) {
-            rangeProofCache.Erase(entry);
-        }
+    if (rangeProofCache.Get(entry, !store)) {
         return true;
     }
 
@@ -134,9 +131,5 @@ bool CachingRangeProofChecker::VerifyRangeProof(const std::vector<unsigned char>
         return false;
     }
 
-    if (store) {
-        rangeProofCache.Set(entry);
-    }
     return true;
-
 }
