@@ -7,7 +7,7 @@
 #include "coins.h"
 #include "uint256.h"
 #include "wallet/wallet.h"
-#include "main.h"
+#include "validation.h"
 
 #include "test/test_bitcoin.h"
 
