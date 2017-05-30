@@ -451,7 +451,7 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
     SendMoney(address.Get(), nAmount, fSubtractFeeFromAmount, confidentiality_pubkey, wtx);
 
     std::string blinds;
-    for (unsigned int i=0; i<wtx.vout.size(); i++) {
+    for (unsigned int i=0; i<wtx.tx->vout.size(); i++) {
         blinds += "blind:" + wtx.GetBlindingFactor(i).ToString() + "\n";
     }
 
@@ -1035,7 +1035,7 @@ UniValue sendmany(const JSONRPCRequest& request)
     }
 
     std::string blinds;
-    for (unsigned int i=0; i<wtx.vout.size(); i++) {
+    for (unsigned int i=0; i<wtx.tx->vout.size(); i++) {
         blinds += "blind:" + wtx.GetBlindingFactor(i).ToString() + "\n";
     }
 
@@ -3295,7 +3295,7 @@ UniValue sendtomainchain(const JSONRPCRequest& request)
     SendMoney(scriptPubKey, nAmount, false, CPubKey(), wtxNew);
 
     std::string blinds;
-    for (unsigned int i=0; i<wtxNew.vout.size(); i++) {
+    for (unsigned int i=0; i<wtxNew.tx->vout.size(); i++) {
         blinds += "blind:" + wtxNew.GetBlindingFactor(i).ToString() + "\n";
     }
 
