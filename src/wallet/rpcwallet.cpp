@@ -3357,7 +3357,7 @@ UniValue claimpegin(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_TYPE_ERROR, "The included txoutproof is malformed. Are you sure that is the whole string?");
     }
 
-if (!ssTxOutProof.empty() || !CheckBitcoinProof(merkleBlock.header.GetHash(), merkleBlock.header.bitcoinproof.challenge))
+    if (!ssTxOutProof.empty() || !CheckBitcoinProof(merkleBlock.header.GetHash(), merkleBlock.header.bitcoinproof.challenge))
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx out proof");
 
     vector<uint256> txHashes;
