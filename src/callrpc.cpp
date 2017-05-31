@@ -76,7 +76,7 @@ static void http_error_cb(enum evhttp_request_error err, void *ctx)
 }
 #endif
 
-UniValue CallRPC(const string& strMethod, const UniValue& params, bool connectToMainchain)
+UniValue CallRPC(const std::string& strMethod, const UniValue& params, bool connectToMainchain)
 {
     std::string strhost = "-rpcconnect";
     std::string strport = "-rpcport";
@@ -129,10 +129,10 @@ UniValue CallRPC(const string& strMethod, const UniValue& params, bool connectTo
         }
     } else {
         if (struser == "")
-            throw runtime_error(
+            throw std::runtime_error(
                  _("Could not locate mainchain RPC credentials. No authentication cookie could be found, and no mainchainrpcuser is set in the configuration file"));
         else
-            strRPCUserColonPass = mapArgs[struser] + ":" + mapArgs[strpassword];
+            strRPCUserColonPass = GetArg(struser, "") + ":" + GetArg(strpassword, "");
     }
 
     struct evkeyvalq* output_headers = evhttp_request_get_output_headers(req.get());
