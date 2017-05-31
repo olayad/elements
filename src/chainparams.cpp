@@ -69,7 +69,7 @@ public:
         CScript defaultSignblockScript;
         // Default blocksign script for elements
         defaultSignblockScript = CScript() << OP_2 << ParseHex("03206b45265ae687dfdc602b8faa7dd749d7865b0e51f986e12c532229f0c998be") << ParseHex("02cc276552e180061f64dc16e2a02e7f9ecbcc744dea84eddbe991721824df825c") << ParseHex("0204c6be425356d9200a3303d95f2c39078cc9473ca49619da1e0ec233f27516ca") << OP_3 << OP_CHECKMULTISIG;
-        CScript genesisChallengeScript = StrHexToScriptWithDefault(GetArg("-signblockscript", "", mapArgs), defaultSignblockScript);
+        CScript genesisChallengeScript = StrHexToScriptWithDefault(GetArg("-signblockscript", ""), defaultSignblockScript);
 
         strNetworkID = CHAINPARAMS_ELEMENTS;
         consensus.nSubsidyHalvingInterval = 210000;
@@ -181,7 +181,7 @@ class CRegTestParams : public CChainParams {
 public:
     CRegTestParams() {
         const CScript defaultRegtestScript(CScript() << OP_TRUE);
-        CScript genesisChallengeScript = StrHexToScriptWithDefault(GetArg("-signblockscript", "", mapArgs), defaultRegtestScript);
+        CScript genesisChallengeScript = StrHexToScriptWithDefault(GetArg("-signblockscript", ""), defaultRegtestScript);
 
         strNetworkID = CHAINPARAMS_REGTEST;
         consensus.nSubsidyHalvingInterval = 150;
