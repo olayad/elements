@@ -1343,7 +1343,7 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
                     }
 
                     valtype vchHash(32);
-                    CSHA256().Write(begin_ptr(vchData), vchData.size()).Finalize(begin_ptr(vchHash));
+                    CSHA256().Write(vchData.data(), vchData.size()).Finalize(vchHash.data());
                     uint256 hash(vchHash);
 
                     CPubKey pubkey(vchPubKey);
@@ -1391,11 +1391,11 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
                     uint64_t nCounter = 0;
                     int nHashIndex = 3;
                     CSHA256 hasher;
-                    hasher.Write(begin_ptr(vchSeed), vchSeed.size());
+                    hasher.Write(vchSeed.data(), vchSeed.size());
                     do {
                         if (nHashIndex >= 3) {
                             //TODO this isn't endian safe
-                            CSHA256(hasher).Write((const unsigned char*)&nCounter, sizeof(nCounter)).Finalize(begin_ptr(vchHash));
+                            CSHA256(hasher).Write((const unsigned char*)&nCounter, sizeof(nCounter)).Finalize(vchHash.data());
                             nHashIndex = 0;
                             nCounter++;
                         }
