@@ -349,7 +349,7 @@ UniValue createmultisig(const JSONRPCRequest& request)
     return result;
 }
 
-UniValue verifymessage(const JSONRPCRequest& request)
+UniValue createblindedaddress(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 2)
     {
@@ -391,6 +391,7 @@ UniValue verifymessage(const JSONRPCRequest& request)
     return address.AddBlindingKey(key.GetPubKey()).ToString();
 }
 
+UniValue verifymessage(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() != 3)
         throw runtime_error(
