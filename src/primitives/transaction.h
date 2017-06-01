@@ -152,8 +152,8 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-        if ((nVersion & SERIALIZE_BITCOIN_BLOCK_OR_TX) || IsInBitcoinTransaction()) {
+    inline void SerializationOp(Stream& s, Operation ser_action) {
+        if ((s.GetVersion() & SERIALIZE_BITCOIN_BLOCK_OR_TX) || IsInBitcoinTransaction()) {
             if (ser_action.ForRead()) {
                 vchAssetTag.resize(1);
                 vchAssetTag[0] = 0;
