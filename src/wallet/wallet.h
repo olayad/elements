@@ -713,12 +713,6 @@ public:
 
     const std::string strWalletFile;
 
-    std::set<int64_t> setKeyPool;
-    std::map<CKeyID, CKeyMetadata> mapKeyMetadata;
-    std::map<CScriptID, uint256> mapSpecificBlindingKeys;
-    std::map<CAssetID, std::string> mapAssetLabels;
-    std::map<std::string, CAssetID> mapAssetIDs;
-
     void LoadKeyPool(int nIndex, const CKeyPool &keypool)
     {
         setKeyPool.insert(nIndex);
@@ -739,6 +733,9 @@ public:
     MasterKeyMap mapMasterKeys;
     unsigned int nMasterKeyMaxID;
     std::map<CScriptID, uint256> mapSpecificBlindingKeys;
+    std::map<CAssetID, std::string> mapAssetLabels;
+    std::map<std::string, CAssetID> mapAssetIDs;
+
 
     CWallet()
     {

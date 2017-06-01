@@ -484,8 +484,8 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
         fSubtractFeeFromAmount = request.params[4].get_bool();
 
     std::string asset = "bitcoin";
-    if (params.size() > 5 && params[5].isStr()) {
-        asset = params[5].get_str();
+    if (request.params.size() > 5 && request.params[5].isStr()) {
+        asset = request.params[5].get_str();
     }
 
     CAssetID id(uint256S(asset));
@@ -676,8 +676,8 @@ UniValue getreceivedbyaddress(const JSONRPCRequest& request)
     }
 
     std::string asset = "bitcoin";
-    if (params.size() > 2 && params[2].isStr()) {
-        asset = params[2].get_str();
+    if (request.params.size() > 2 && request.params[2].isStr()) {
+        asset = request.params[2].get_str();
     }
     return PushAssetBalance(mapAmount, pwalletMain, asset);
 }
@@ -1056,10 +1056,10 @@ UniValue sendmany(const JSONRPCRequest& request)
         subtractFeeFromAmount = request.params[4].get_array();
 
     UniValue assetids;
-    if (params.size() > 5 && !params[5].isNull()) {
+    if (request.params.size() > 5 && !request.params[5].isNull()) {
         if (strAccount != "")
            throw JSONRPCError(RPC_TYPE_ERROR, "Accounts can not be used with assets.");
-        assetids = params[5].get_obj();
+        assetids = request.params[5].get_obj();
     }
 
     set<CBitcoinAddress> setAddress;
@@ -2021,8 +2021,8 @@ UniValue gettransaction(const JSONRPCRequest& request)
             filter = filter | ISMINE_WATCH_ONLY;
 
     std::string strasset = "bitcoin";
-    if (params.size() > 2) {
-        strasset = params[2].get_str();
+    if (request.params.size() > 2) {
+        strasset = request.params[2].get_str();
     }
 
     UniValue entry(UniValue::VOBJ);
@@ -2569,8 +2569,8 @@ UniValue getwalletinfo(const JSONRPCRequest& request)
     obj.push_back(Pair("walletversion", pwalletMain->GetVersion()));
 
     std::string asset = "bitcoin";
-    if (params.size() > 0 && params[0].isStr()) {
-        asset = params[0].get_str();
+    if (request.params.size() > 0 && request.params[0].isStr()) {
+        asset = request.params[0].get_str();
     }
     CAmountMap balance = pwalletMain->GetBalance();
     CAmountMap unBalance = pwalletMain->GetUnconfirmedBalance();
@@ -3188,7 +3188,7 @@ UniValue bumpfee(const JSONRPCRequest& request)
     }
 
     // commit/broadcast the tx
-    CReserveKey reservekey(pwalletMain);
+    std::vector<CReserveKey*> vpChangeKey;
     CWalletTx wtxBumped(pwalletMain, MakeTransactionRef(std::move(tx)));
     wtxBumped.mapValue = wtx.mapValue;
     wtxBumped.mapValue["replaces_txid"] = hash.ToString();
@@ -3197,7 +3197,7 @@ UniValue bumpfee(const JSONRPCRequest& request)
     wtxBumped.fTimeReceivedIsTxTime = true;
     wtxBumped.fFromMe = true;
     CValidationState state;
-    if (!pwalletMain->CommitTransaction(wtxBumped, reservekey, g_connman.get(), state)) {
+    if (!pwalletMain->CommitTransaction(wtxBumped, vpChangeKey, g_connman.get(), state)) {
         // NOTE: CommitTransaction never returns false, so this should never happen.
         throw JSONRPCError(RPC_WALLET_ERROR, strprintf("Error: The transaction was rejected! Reason given: %s", state.GetRejectReason()));
     }
@@ -3657,9 +3657,9 @@ UniValue addassetlabel(const JSONRPCRequest& request)
             + HelpExampleCli("addassetlabel", "\"fa821b0be5e1387adbcb69dbb3ad33edb5e470831c7c938c4e7b344edbe8bb11\", \"ethereum\"")
             + HelpExampleRpc("addassetlabel", "\"fa821b0be5e1387adbcb69dbb3ad33edb5e470831c7c938c4e7b344edbe8bb11\", \"ethereum\"")
         );
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR));
+    RPCTypeCheck(request.params, boost::assign::list_of(UniValue::VSTR)(UniValue::VSTR));
 
-    std::string id = requestparams[0].get_str();
+    std::string id = request.params[0].get_str();
     std::string label = request.params[1].get_str();
     if (!IsHex(id) || id.size() != 64)
         throw JSONRPCError(RPC_TYPE_ERROR, "Asset ID must be hex of length 64");
@@ -3691,16 +3691,17 @@ UniValue dumpassetlabels(const JSONRPCRequest& request)
     return obj;
 }
 
-extern UniValue dumpprivkey(const UniValue& params, bool fHelp); // in rpcdump.cpp
-extern UniValue importprivkey(const UniValue& params, bool fHelp);
-extern UniValue importaddress(const UniValue& params, bool fHelp);
-extern UniValue importpubkey(const UniValue& params, bool fHelp);
-extern UniValue dumpwallet(const UniValue& params, bool fHelp);
-extern UniValue importwallet(const UniValue& params, bool fHelp);
-extern UniValue importprunedfunds(const UniValue& params, bool fHelp);
-extern UniValue removeprunedfunds(const UniValue& params, bool fHelp);
-extern UniValue dumpblindingkey(const UniValue& params, bool fHelp);
-extern UniValue importblindingkey(const UniValue& params, bool fHelp);
+extern UniValue dumpprivkey(const JSONRPCRequest& request); // in rpcdump.cpp
+extern UniValue importprivkey(const JSONRPCRequest& request);
+extern UniValue importaddress(const JSONRPCRequest& request);
+extern UniValue importpubkey(const JSONRPCRequest& request);
+extern UniValue dumpwallet(const JSONRPCRequest& request);
+extern UniValue importwallet(const JSONRPCRequest& request);
+extern UniValue importprunedfunds(const JSONRPCRequest& request);
+extern UniValue removeprunedfunds(const JSONRPCRequest& request);
+extern UniValue importmulti(const JSONRPCRequest& request);
+extern UniValue dumpblindingkey(const JSONRPCRequest& request);
+extern UniValue importblindingkey(const JSONRPCRequest& request);
 
 static const CRPCCommand commands[] =
 { //  category              name                        actor (function)           okSafeMode

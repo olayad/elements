@@ -92,13 +92,13 @@ UniValue getinfo(const JSONRPCRequest& request)
         obj.push_back(Pair("walletversion", pwalletMain->GetVersion()));
         CAmountMap balance = pwalletMain->GetBalance();
         std::string strasset = "bitcoin";
-        if (params.size() > 0) {
-            strasset = params[0].get_str();
+        if (request.params.size() > 0) {
+            strasset = request.params[0].get_str();
         }
         obj.push_back(Pair("balance", PushAssetBalance(balance, pwalletMain, strasset)));
     }
     else {
-        if (!params[0].isNull())
+        if (!request.params[0].isNull())
             throw JSONRPCError(RPC_WALLET_ERROR, "Wallet must be enabled to list asset balances.");
     }
 #endif

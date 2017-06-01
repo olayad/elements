@@ -474,8 +474,8 @@ UniValue createrawtransaction(const JSONRPCRequest& request)
     }
 
     UniValue assetids;
-    if (params.size() > 3 && !params[3].isNull()) {
-        assetids = params[3].get_obj();
+    if (request.params.size() > 3 && !request.params[3].isNull()) {
+        assetids = request.params[3].get_obj();
     }
 
     uint256 bitcoinid(BITCOINID);
@@ -662,9 +662,9 @@ UniValue rawblindrawtransaction(const JSONRPCRequest& request)
     }
 
     UniValue inputBlinds = request.params[1].get_array();
-    UniValue inputAmounts = params[2].get_array();
-    UniValue inputAssetIDs = params[3].get_array();
-    UniValue inputAssetBlinds = params[4].get_array();
+    UniValue inputAmounts = request.params[2].get_array();
+    UniValue inputAssetIDs = request.params[3].get_array();
+    UniValue inputAssetBlinds = request.params[4].get_array();
 
     if (inputBlinds.size() != tx.vin.size()) throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter: one (potentially empty) input blind for each input must be provided"));
     if (inputAmounts.size() != tx.vin.size()) throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter: one (potentially empty) input blind for each input must be provided"));
@@ -770,16 +770,16 @@ UniValue blindrawtransaction(const JSONRPCRequest& request)
         }
         input_blinds.push_back(it->second.GetBlindingFactor(tx.vin[nIn].prevout.n));
         input_asset_blinds.push_back(it->second.GetAssetBlindingFactor(tx.vin[nIn].prevout.n));
-        if (it->second.vout[tx.vin[nIn].prevout.n].nAsset.IsAssetID()) {
+        if (it->second.tx->vout[tx.vin[nIn].prevout.n].nAsset.IsAssetID()) {
             uint256 assetID;
-            it->second.vout[tx.vin[nIn].prevout.n].nAsset.GetAssetID(assetID);
+            it->second.tx->vout[tx.vin[nIn].prevout.n].nAsset.GetAssetID(assetID);
             input_asset_ids.push_back(assetID);
         }
         else {
             input_asset_ids.push_back(it->second.GetAssetID(tx.vin[nIn].prevout.n));
         }
-        if (it->second.vout[tx.vin[nIn].prevout.n].nValue.IsAmount()) {
-            input_amounts.push_back(it->second.vout[tx.vin[nIn].prevout.n].nValue.GetAmount());
+        if (it->second.tx->vout[tx.vin[nIn].prevout.n].nValue.IsAmount()) {
+            input_amounts.push_back(it->second.tx->vout[tx.vin[nIn].prevout.n].nValue.GetAmount());
         }
         else {
             input_amounts.push_back(it->second.GetValueOut(tx.vin[nIn].prevout.n));
