@@ -3015,7 +3015,7 @@ UniValue bumpfee(const JSONRPCRequest& request)
     }
 
     // calculate the old fee and fee-rate
-    CAmount nOldFee = wtx.tx->nTxFee;
+    CAmount nOldFee = wtx.tx->GetFee();
     CFeeRate nOldFeeRate(nOldFee, txSize);
     CAmount nNewFee;
     CFeeRate nNewFeeRate;

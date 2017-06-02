@@ -1838,7 +1838,6 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
             return state.Invalid(false, 0, "", "Inputs unavailable");
 
         CAmount nValueIn = 0;
-        CAmount nFees = 0;
         for (unsigned int i = 0; i < tx.vin.size(); i++)
         {
             const COutPoint &prevout = tx.vin[i].prevout;
@@ -1894,9 +1893,6 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
 
         if (pvChecks)
             pvChecks->reserve(tx.vin.size());
-
-        // Tally validity checked in CheckTxInputs
-        CAmount fee = tx.GetFee();
 
         // The first loop above does all the inexpensive checks.
         // Only if ALL inputs pass do we perform expensive ECDSA signature checks.
