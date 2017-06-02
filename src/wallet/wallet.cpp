@@ -1995,7 +1995,7 @@ void CWalletTx::GetBlindingData(unsigned int nOut, CAmount* pamountOut, CPubKey*
         memcpy(asset.begin(), &*(it + 73), 32);
         pubkey.Set(it + 105, it + 138);
     } else {
-        pwallet->ComputeBlindingData(tx->vout[nOut], amount, pubkey, blindingfactor, assetID, assetBlindingFactor);
+        pwallet->ComputeBlindingData(tx->vout[nOut], amount, pubkey, blindingfactor, asset, assetBlindingFactor);
         *it = 1;
         memcpy(&*(it + 1), &amount, 8);
         memcpy(&*(it + 9), blindingfactor.begin(), 32);
