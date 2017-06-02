@@ -3637,10 +3637,10 @@ UniValue dumpassetlabels(const JSONRPCRequest& request)
 
     if (request.fHelp || request.params.size() != 0)
         throw runtime_error(
-            + HelpExampleCli("generateasset", "\"my asset\" 10" )
-            + HelpExampleRpc("generateasset", "\"my asset\" 10" )
             "dumpassetlabels\n"
             "\nLists all known asset id/label pairs in this wallet. This list can be modified by `addassetlabel` command.\n"
+            + HelpExampleCli("generateasset", "\"my asset\" 10" )
+            + HelpExampleRpc("generateasset", "\"my asset\" 10" )
         );
     UniValue obj(UniValue::VOBJ);
     for (std::map<std::string, CAssetID>::const_iterator it = pwalletMain->mapAssetIDs.begin(); it != pwalletMain->mapAssetIDs.end(); it++) {
