@@ -2646,7 +2646,7 @@ UniValue listunspent(const JSONRPCRequest& request)
 
     std::string assetstr = "bitcoin";
     if (request.params.size() > 4 && request.params[4].isStr()) {
-        asset = request.params[4].get_str();
+        assetstr = request.params[4].get_str();
     }
     CAsset asset;
     if (assetstr != "*") {
