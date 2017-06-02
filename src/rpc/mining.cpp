@@ -148,9 +148,9 @@ UniValue generate(const JSONRPCRequest& request)
             throw JSONRPCError(RPC_METHOD_NOT_FOUND, "This method cannot be used with a block-signature-required chain");
         std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(pblocktemplate->block);
         bool ret;
-        ret = ProcessNewBlock(state, Params(), NULL, &pblocktemplate->block, true, NULL);
+        ret = ProcessNewBlock(Params(), shared_pblock, true, NULL);
         assert(ret);
-        assert(state.IsValid() && chainActive.Tip()->GetBlockHash() == pblocktemplate->block.GetHash());
+        assert(chainActive.Tip()->GetBlockHash() == pblocktemplate->block.GetHash());
         arr.push_back(pblocktemplate->block.GetHash().ToString());
     }
     return arr;
