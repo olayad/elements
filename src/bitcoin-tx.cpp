@@ -256,19 +256,19 @@ static void MutateTxAddOutAddr(CMutableTransaction& tx, const std::string& strIn
         throw std::runtime_error("TX output missing separator");
 
     // extract and validate VALUE
-    string strValue = vStrOutAddrParts[0];
+    std::string strValue = vStrOutAddrParts[0];
     CAmount value;
     if (!ParseMoney(strValue, value))
         throw std::runtime_error("invalid TX output value");
 
     // extract and validate ADDRESS
-    string strAddr = vStrOutAddrParts[1];
+    std::string strAddr = vStrOutAddrParts[1];
     CBitcoinAddress addr(strAddr);
     if (!addr.IsValid())
         throw std::runtime_error("invalid TX output address");
 
     // extract and validate ASSET
-    string strAsset = vStrOutAddrParts[2];
+    std::string strAsset = vStrOutAddrParts[2];
     CAssetID asset = uint256S(strAsset);
     if (asset == CAssetID())
         throw std::runtime_error("invalid TX output asset type");
@@ -494,20 +494,20 @@ static void MutateTxAddOutScript(CMutableTransaction& tx, const std::string& str
     std::vector<std::string> vStrOutScriptParts;
     boost::split(vStrOutScriptParts, strInput, boost::is_any_of(":"));
     if (vStrOutScriptParts.size()<3)
-        throw runtime_error("TX out script missing separator");
+        throw std::runtime_error("TX out script missing separator");
 
     // Extract and validate VALUE
-    string strValue = vStrOutScriptParts[0];
+    std::string strValue = vStrOutScriptParts[0];
     CAmount value;
     if (!ParseMoney(strValue, value))
         throw std::runtime_error("invalid TX output value");
 
     // extract and validate script
-    string strScript = vStrOutScriptParts[1];
+    std::string strScript = vStrOutScriptParts[1];
     CScript scriptPubKey = ParseScript(strScript); // throws on err
 
     // extract and validate asset
-    string strAsset = vStrOutScriptParts[2];
+    std::string strAsset = vStrOutScriptParts[2];
     CAssetID asset = uint256S(strAsset);
 
     // construct TxOut, append to transaction output list
