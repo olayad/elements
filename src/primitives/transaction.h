@@ -359,7 +359,7 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion)
+    inline void SerializationOp(Stream& s, Operation ser_action)
     {
         READWRITE(hashNonce);
         READWRITE(nAmount);
@@ -407,7 +407,7 @@ public:
     // tokens in circulation (treated as an input), -1 if the reissuance
     // is decreasing the number of tokens (treated as an output), and 0
     // if there is no reissuance (reissuance object is Null).
-    int nSign;
+    int sign;
 
 public:
     // FIXME: constructor and methods
@@ -415,7 +415,7 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion)
+    inline void SerializationOp(Stream& s, Operation ser_action)
     {
         READWRITE(hashAssetEntropy);
         READWRITE(assetBlindingNonce);
