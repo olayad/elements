@@ -2631,8 +2631,8 @@ UniValue listunspent(const JSONRPCRequest& request)
     }
 
     std::string asset = "bitcoin";
-    if (params.size() > 4 && params[4].isStr()) {
-        asset = params[3].get_str();
+    if (request.params.size() > 4 && request.params[4].isStr()) {
+        asset = request.params[3].get_str();
     }
     CAssetID id(uint256S(asset));
     if (asset != "*" && pwalletMain->GetAssetLabelFromID(uint256S(asset)) == "")
