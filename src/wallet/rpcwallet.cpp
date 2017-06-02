@@ -397,7 +397,6 @@ static void SendMoney(const CScript& scriptPubKey, CAmount nValue, CAssetID asse
     // Create and send the transaction
     std::vector<CReserveKey*> vpChangeKey;
     std::vector<CReserveKey> vChangeKey;
-    // For some reason reserving avoids a segfault? TODO Diagnose this
     vChangeKey.reserve(2);
     vChangeKey.emplace_back(pwalletMain);
     vpChangeKey.push_back(&vChangeKey[0]);
