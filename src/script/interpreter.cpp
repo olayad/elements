@@ -7,7 +7,7 @@
 
 #include <secp256k1.h>
 
-#include "primitives/transaction.h"
+#include "primitives/bitcoin/transaction.h"
 #include "primitives/bitcoin/merkleblock.h"
 #include "crypto/ripemd160.h"
 #include "crypto/sha1.h"
@@ -1480,7 +1480,7 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
                                 Sidechain::Bitcoin::CMerkleBlock merkleBlock;
                                 CDataStream merkleBlockStream(vmerkleBlock, SER_NETWORK, PROTOCOL_VERSION);
                                 merkleBlockStream >> merkleBlock;
-                                if (!merkleBlockStream.empty() || !CheckBitcoinProof(merkleBlock.header.GetHash(), merkleBlock.header.bitcoinproof.challenge))
+                                if (!merkleBlockStream.empty() || !CheckBitcoinProof(merkleBlock.header.GetHash(), merkleBlock.header.nBits))
                                     return set_error(serror, SCRIPT_ERR_WITHDRAW_VERIFY_BLOCK);
 
                                 vector<uint256> txHashes;

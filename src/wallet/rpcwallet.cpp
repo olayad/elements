@@ -16,6 +16,7 @@
 #include "policy/policy.h"
 #include "policy/rbf.h"
 #include "primitives/bitcoin/merkleblock.h"
+#include "primitives/bitcoin/transaction.h"
 #include "rpc/server.h"
 #include "script/sign.h"
 #include "random.h"
@@ -3497,7 +3498,7 @@ UniValue claimpegin(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_TYPE_ERROR, "The included txoutproof is malformed. Are you sure that is the whole string?");
     }
 
-    if (!ssTxOutProof.empty() || !CheckBitcoinProof(merkleBlock.header.GetHash(), merkleBlock.header.bitcoinproof.challenge))
+    if (!ssTxOutProof.empty() || !CheckBitcoinProof(merkleBlock.header.GetHash(), merkleBlock.header.nBits))
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx out proof");
 
     vector<uint256> txHashes;

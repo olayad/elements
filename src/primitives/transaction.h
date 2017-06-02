@@ -600,7 +600,6 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
 template<typename Stream, typename TxType>
 inline void SerializeTransaction(const TxType& tx, Stream& s) {
     const bool fAllowWitness = !(s.GetVersion() & SERIALIZE_TRANSACTION_NO_WITNESS);
-    const bool fIsBitcoinTx = (s.GetVersion() & SERIALIZE_BITCOIN_BLOCK_OR_TX);
 
     s << tx.nVersion;
 

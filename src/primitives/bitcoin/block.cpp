@@ -3,9 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-// Taken from
-// //github.com/bitcoin/bitcoin/blob/0d719145b018e28d48d35c2646a5962b87c60436/src/primitives/block.cpp
-// with minimal modification.
+// Taken from 27765b6403cece54320374b37afb01a0cfe571c3 with minimal modification.
 
 #include "primitives/bitcoin/block.h"
 
@@ -34,7 +32,7 @@ std::string CBlock::ToString() const
         vtx.size());
     for (unsigned int i = 0; i < vtx.size(); i++)
     {
-        s << "  " << vtx[i].ToString() << "\n";
+        s << "  " << vtx[i]->ToString() << "\n";
     }
     return s.str();
 }

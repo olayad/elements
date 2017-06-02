@@ -3,9 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-// Taken from
-// //github.com/bitcoin/bitcoin/blob/0d719145b018e28d48d35c2646a5962b87c60436/src/merkleblock.cpp
-// with minimal modification.
+// Taken from b7b48c8bbdf7a90861610b035d8b0a247ef78c45 with minimal modification.
 
 #include "primitives/bitcoin/merkleblock.h"
 
@@ -18,25 +16,24 @@ using namespace std;
 namespace Sidechain {
 namespace Bitcoin {
 
-// Bloom filter support is not required for the sidechain peg.
 #if 0
 CMerkleBlock::CMerkleBlock(const CBlock& block, CBloomFilter& filter)
 {
     header = block.GetBlockHeader();
 
-    vector<bool> vMatch;
-    vector<uint256> vHashes;
+    std::vector<bool> vMatch;
+    std::vector<uint256> vHashes;
 
     vMatch.reserve(block.vtx.size());
     vHashes.reserve(block.vtx.size());
 
     for (unsigned int i = 0; i < block.vtx.size(); i++)
     {
-        const uint256& hash = block.vtx[i].GetHash();
-        if (filter.IsRelevantAndUpdate(block.vtx[i]))
+        const uint256& hash = block.vtx[i]->GetHash();
+        if (filter.IsRelevantAndUpdate(*block.vtx[i]))
         {
             vMatch.push_back(true);
-            vMatchedTxn.push_back(make_pair(i, hash));
+            vMatchedTxn.push_back(std::make_pair(i, hash));
         }
         else
             vMatch.push_back(false);
@@ -51,15 +48,15 @@ CMerkleBlock::CMerkleBlock(const CBlock& block, const std::set<uint256>& txids)
 {
     header = block.GetBlockHeader();
 
-    vector<bool> vMatch;
-    vector<uint256> vHashes;
+    std::vector<bool> vMatch;
+    std::vector<uint256> vHashes;
 
     vMatch.reserve(block.vtx.size());
     vHashes.reserve(block.vtx.size());
 
     for (unsigned int i = 0; i < block.vtx.size(); i++)
     {
-        const uint256& hash = block.vtx[i].GetHash();
+        const uint256& hash = block.vtx[i]->GetHash();
         if (txids.count(hash))
             vMatch.push_back(true);
         else

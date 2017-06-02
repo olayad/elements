@@ -3,9 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-// Taken from
-// //github.com/bitcoin/bitcoin/blob/0d719145b018e28d48d35c2646a5962b87c60436/src/merkleblock.h
-// with minimal modification.
+// Taken from 27765b6403cece54320374b37afb01a0cfe571c3 with minimal modification.
 
 #ifndef BITCOIN_PRIMITIVES_BITCOIN_MERKLEBLOCK_H
 #define BITCOIN_PRIMITIVES_BITCOIN_MERKLEBLOCK_H
@@ -92,7 +90,7 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(nTransactions);
         READWRITE(vHash);
         std::vector<unsigned char> vBytes;
@@ -140,16 +138,12 @@ public:
     /** Public only for unit testing and relay testing (not relayed) */
     std::vector<std::pair<unsigned int, uint256> > vMatchedTxn;
 
-// Bloom filter support is not required for the sidechain peg. Enabling the
-// following API would require modifying CBloomFilter as well.
-#if 0
     /**
      * Create from a CBlock, filtering transactions according to filter
      * Note that this will call IsRelevantAndUpdate on the filter for each transaction,
      * thus the filter will likely be modified.
      */
     CMerkleBlock(const CBlock& block, CBloomFilter& filter);
-#endif // 0
 
     // Create from a CBlock, matching the txids in the set
     CMerkleBlock(const CBlock& block, const std::set<uint256>& txids);
@@ -159,7 +153,7 @@ public:
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
+    inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(header);
         READWRITE(txn);
     }

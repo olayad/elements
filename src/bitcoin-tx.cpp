@@ -17,6 +17,7 @@
 #include "policy/policy.h"
 #include "pow.h"
 #include "primitives/transaction.h"
+#include "primitives/bitcoin/transaction.h"
 #include "primitives/bitcoin/merkleblock.h"
 #include "script/script.h"
 #include "script/sign.h"
@@ -746,13 +747,13 @@ static void MutateTxPeginSign(CMutableTransaction& tx, const std::string& flagSt
     ssProof >> merkleBlock;
 
     CDataStream ssTx(txData, SER_NETWORK, PROTOCOL_VERSION);
-    CTransactionRef txBTCRef;
+    Sidechain::Bitcoin::CTransactionRef txBTCRef;
     ssTx >> txBTCRef;
     Sidechain::Bitcoin::CTransaction txBTC(*txBTCRef);
 
     std::vector<uint256> transactionHashes;
     std::vector<unsigned int> transactionIndices;
-    if (!CheckBitcoinProof(merkleBlock.header.GetHash(), merkleBlock.header.bitcoinproof.challenge) ||
+    if (!CheckBitcoinProof(merkleBlock.header.GetHash(), merkleBlock.header.nBits) ||
             merkleBlock.txn.ExtractMatches(transactionHashes, transactionIndices) != merkleBlock.header.hashMerkleRoot ||
             transactionHashes.size() != 1 ||
             transactionHashes[0] != txBTC.GetHash())
