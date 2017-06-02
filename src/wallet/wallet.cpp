@@ -1312,7 +1312,7 @@ bool CWallet::IsAllFromMe(const CTransaction& tx, const isminefilter& filter) co
     return true;
 }
 
-CAmount CWallet::GetCredit(const CWalletTx& tx, const isminefilter& filter) const
+CAmountMap CWallet::GetCredit(const CWalletTx& tx, const isminefilter& filter) const
 {
     CAmountMap nCredit;
     for (unsigned int i = 0; i < tx.tx->vout.size(); i++)
@@ -1995,8 +1995,7 @@ void CWalletTx::GetBlindingData(unsigned int nOut, CAmount* pamountOut, CPubKey*
         memcpy(assetID.begin(), &*(it + 73), 32);
         pubkey.Set(it + 105, it + 138);
     } else {
-        pwallet->ComputeBlindingData(tx->vout[nOut], amount, pubkey, blindingfactor);
-            assetID, assetBlindingFactor);
+        pwallet->ComputeBlindingData(tx->vout[nOut], amount, pubkey, blindingfactor, assetID, assetBlindingFactor);
         *it = 1;
         memcpy(&*(it + 1), &amount, 8);
         memcpy(&*(it + 9), blindingfactor.begin(), 32);
@@ -2314,6 +2313,8 @@ static void ApproximateBestSubset(vector<pair<CAmount, pair<const CWalletTx*,uns
     }
 }
 
+typedef std::pair<CAmount, std::pair<const CWalletTx*,unsigned int> > SelectCoin;
+
 bool CWallet::SelectCoinsMinConf(const CAmountMap& mapTargetValue, const int nConfMine, const int nConfTheirs, const uint64_t nMaxAncestors, vector<COutput> vCoins,
                                  set<pair<const CWalletTx*,unsigned int> >& setCoinsRet, CAmountMap& mapValueRet) const
 {
@@ -2324,7 +2325,7 @@ bool CWallet::SelectCoinsMinConf(const CAmountMap& mapTargetValue, const int nCo
     std::map<CAssetID, std::vector<SelectCoin> > mapVValue;
 
     // List of values less than target
-    std::map<CAssetID, SelectCoin > mapCoinLowestLarger;
+    std::map<CAssetID, SelectCoin> mapCoinLowestLarger;
     // For all positive assets
     std::set<CAssetID> setAssetsToMatch;
     for(std::map<CAssetID, CAmount>::const_iterator it = mapTargetValue.begin(); it != mapTargetValue.end(); it++) {
@@ -2602,9 +2603,11 @@ bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount& nFeeRet, bool ov
     }
 
     // optionally keep the change output key
-    if (keepReserveKey)
-        reservekey.KeepKey();
-
+    if (keepReserveKey) {
+        for (auto& changekey : vpChangeKey) {
+            changekey->KeepKey();
+        }
+    }
     return true;
 }
 
@@ -3060,7 +3063,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
 /**
  * Call after CreateTransaction unless you want to abort
  */
-bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, CConnman* connman, CValidationState& state)
+bool CWallet::CommitTransaction(CWalletTx& wtxNew, std::vector<CReserveKey*>& reservekey, CConnman* connman, CValidationState& state)
 {
     {
         LOCK2(cs_main, cs_wallet);

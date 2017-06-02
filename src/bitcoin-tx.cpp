@@ -438,7 +438,7 @@ static void MutateTxBlind(CMutableTransaction& tx, const std::string& strInput)
         std::vector<std::string> entry;
         boost::split(entry, input_blinding[nIn], boost::is_any_of(","));
         if (entry.size() != 4)
-            throw runtime_error("Each blinding input entry must have value:blinding:assetblinding:assetid attached");
+            throw std::runtime_error("Each blinding input entry must have value:blinding:assetblinding:assetid attached");
         uint256 blind;
         blind.SetHex(entry[1]);
         uint256 assetblind;
@@ -449,12 +449,12 @@ static void MutateTxBlind(CMutableTransaction& tx, const std::string& strInput)
         input_asset_ids.push_back(id);
         CAmount value;
         if (!ParseMoney(entry[0].data(), value))
-            throw runtime_error("invalid TX input value");
+            throw std::runtime_error("invalid TX input value");
         input_amounts.push_back(value);
         input_blinds.push_back(blind);
         if (!(blind == uint256() && assetblind == uint256()) ||
             !(blind != uint256() && assetblind != uint256()))
-            throw runtime_error("Each input must have both zero or non-zero blindings");
+            throw std::runtime_error("Each input must have both zero or non-zero blindings");
         if (blind != uint256()) {
             fBlindedIns = true;
         }
