@@ -159,10 +159,7 @@ bool CachingSurjectionProofChecker::VerifySurjectionProof(secp256k1_surjectionpr
     uint256 entry;
     surjectionProofCache.ComputeEntry(entry, uint256(), vchproof, pubkey);
 
-    if (surjectionProofCache.Get(entry)) {
-        if (!store) {
-            surjectionProofCache.Erase(entry);
-        }
+    if (surjectionProofCache.Get(entry, !store)) {
         return true;
     }
 
@@ -170,8 +167,5 @@ bool CachingSurjectionProofChecker::VerifySurjectionProof(secp256k1_surjectionpr
         return false;
     }
 
-    if (store) {
-        surjectionProofCache.Set(entry);
-    }
     return true;
 }
