@@ -150,7 +150,7 @@ ReadStatus PartiallyDownloadedBlock::InitData(const CBlockHeaderAndShortTxIDs& c
                 // Note that we dont want duplication between extra_txn and mempool to
                 // trigger this case, so we compare witness hashes first
                 if (txn_available[idit->second] &&
-                        txn_available[idit->second]->GetHashWithWitness() != extra_txn[i].second->GetWitnessHash()) {
+                        txn_available[idit->second]->GetHashWithWitness() != extra_txn[i].second->GetHashWithWitness()) {
                     txn_available[idit->second].reset();
                     mempool_count--;
                     extra_count--;
