@@ -2703,8 +2703,8 @@ UniValue listunspent(const JSONRPCRequest& request)
         entry.push_back(Pair("scriptPubKey", HexStr(scriptPubKey.begin(), scriptPubKey.end())));
         entry.push_back(Pair("amount", ValueFromAmount(nValue)));
         entry.push_back(Pair("asset", assetid.GetHex()));
-        if (out.tx->vout[out.i].nAsset.IsCommitment()) {
-            entry.push_back(Pair("assetcommitment", HexStr(out.tx->vout[out.i].nAsset.vchCommitment)));
+        if (out.tx->tx->vout[out.i].nAsset.IsCommitment()) {
+            entry.push_back(Pair("assetcommitment", HexStr(out.tx->tx->vout[out.i].nAsset.vchCommitment)));
         }
         entry.push_back(Pair("confirmations", out.nDepth));
         entry.push_back(Pair("spendable", out.fSpendable));
