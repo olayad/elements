@@ -1679,7 +1679,7 @@ public:
             ::Serialize(s, txTo.vin[nInput].nSequence);
         // Serialize the asset issuance object
         if (!txTo.vin[nInput].assetIssuance.IsNull())
-            ::Serialize(s, txTo.vin[nInput].assetIssuance, nType, nVersion);
+            ::Serialize(s, txTo.vin[nInput].assetIssuance);
     }
 
     /** Serialize an output of txTo */
