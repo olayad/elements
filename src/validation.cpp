@@ -3676,10 +3676,12 @@ std::vector<unsigned char> GenerateCoinbaseCommitment(CBlock& block, const CBloc
     std::vector<unsigned char> ret(32, 0x00);
     if (consensusParams.vDeployments[Consensus::DEPLOYMENT_SEGWIT].nTimeout != 0) {
         if (commitpos == -1) {
-            const_cast<std::vector<CTxOut>*>(&block.vtx[0].vout)->push_back(CTxOut());
+            CMutableTransaction tx0(*block.vtx[0]);
+            tx0.vout.push_back(CTxOut());
+            block.vtx[0] = MakeTransactionRef(std::move(tx0));
             uint256 witnessroot = BlockWitnessMerkleRoot(block);
             CHash256().Write(witnessroot.begin(), 32).Write(&ret[0], 32).Finalize(witnessroot.begin());
-            CTxOut& out = const_cast<std::vector<CTxOut>*>(&block.vtx[0].vout)->back();
+            CTxOut& out = tx0.vout.back();
             out.nValue = 0;
             out.nAsset = policyAsset;
             out.scriptPubKey.resize(38);
@@ -3691,7 +3693,9 @@ std::vector<unsigned char> GenerateCoinbaseCommitment(CBlock& block, const CBloc
             out.scriptPubKey[5] = 0xed;
             memcpy(&out.scriptPubKey[6], witnessroot.begin(), 32);
             commitment = std::vector<unsigned char>(out.scriptPubKey.begin(), out.scriptPubKey.end());
-            block.vtx[0].UpdateHash();
+            CMutableTransaction tx(*block.vtx[0]);
+            tx.vout.push_back(out);
+            block.vtx[0] = MakeTransactionRef(std::move(tx));
         }
     }
     UpdateUncommittedBlockStructures(block, pindexPrev, consensusParams);
