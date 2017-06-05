@@ -230,7 +230,7 @@ uint256 BlockWitnessMerkleRoot(const CBlock& block)
     std::vector<uint256> leaves;
     leaves.resize(block.vtx.size());
     for (size_t s = 0; s < block.vtx.size(); s++) {
-        leaves[s] = block.vtx[s].ComputeWitnessHash();
+        leaves[s] = block.vtx[s]->ComputeWitnessHash();
     }
     return ComputeFastMerkleRoot(leaves);
 }
