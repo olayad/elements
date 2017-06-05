@@ -2004,7 +2004,7 @@ void CWalletTx::GetBlindingData(unsigned int nOut, CAmount* pamountOut, CPubKey*
         memcpy(asset.begin(), &*(it + 73), 32);
         pubkey.Set(it + 105, it + 138);
     } else {
-        pwallet->ComputeBlindingData(vout[nOut], wit.vtxoutwit.size() <= nOut? CTxOutWitness(): wit.vtxoutwit[nOut], amount, pubkey, blindingfactor,
+        pwallet->ComputeBlindingData(tx->vout[nOut], tx->wit.vtxoutwit.size() <= nOut? CTxOutWitness(): tx->wit.vtxoutwit[nOut], amount, pubkey, blindingfactor,
             asset, assetBlindingFactor);
         *it = 1;
         memcpy(&*(it + 1), &amount, 8);
