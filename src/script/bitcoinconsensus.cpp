@@ -76,8 +76,8 @@ static bool verify_flags(unsigned int flags)
     return (flags & ~(bitcoinconsensus_SCRIPT_FLAGS_VERIFY_ALL)) == 0;
 }
 
-static int verify_script(const unsigned char *scriptPubKey, unsigned int scriptPubKeyLen, CTxOutValue amount,
-                                   CTxOutValue amountPreviousInput,
+static int verify_script(const unsigned char *scriptPubKey, unsigned int scriptPubKeyLen, CConfidentialValue amount,
+                                   CConfidentialValue amountPreviousInput,
                                     const unsigned char *txTo        , unsigned int txToLen,
                                     unsigned int nIn, unsigned int flags, bitcoinconsensus_error* err)
 {
