@@ -775,7 +775,7 @@ UniValue blindrawtransaction(const JSONRPCRequest& request)
         input_blinds.push_back(it->second.GetBlindingFactor(tx.vin[nIn].prevout.n));
         input_asset_blinds.push_back(it->second.GetAssetBlindingFactor(tx.vin[nIn].prevout.n));
         if (it->second.tx->vout[tx.vin[nIn].prevout.n].nAsset.IsAsset()) {
-            input_assets.push_back(it->second.vout[tx.vin[nIn].prevout.n].nAsset.GetAsset());
+            input_assets.push_back(it->second.tx->vout[tx.vin[nIn].prevout.n].nAsset.GetAsset());
         }
         else {
             input_assets.push_back(it->second.GetAsset(tx.vin[nIn].prevout.n));
