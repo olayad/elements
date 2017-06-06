@@ -1201,7 +1201,7 @@ UniValue dumpissuanceblindingkey(const JSONRPCRequest& request)
     if (!request.params[1].isNum()) {
         throw JSONRPCError(RPC_TYPE_ERROR, "vin must be an integer");
     }
-    vindex = params[1].get_int();
+    vindex = request.params[1].get_int();
 
     // Process as issuance key dump
     for (map<uint256, CWalletTx>::const_iterator it = pwalletMain->mapWallet.begin(); it != pwalletMain->mapWallet.end(); ++it) {
@@ -1217,7 +1217,7 @@ UniValue dumpissuanceblindingkey(const JSONRPCRequest& request)
         }
         // We can actually deblinds the input
         if (pcoin->GetIssuanceAmount(vindex, false) != -1 ) {
-            CScript blindingScript(CScript() << OP_RETURN << std::vector<unsigned char>(pcoin->tx->vin[vindex].prevout.hash.begin(), pcoin->vin[vindex].prevout.hash.end()) << pcoin->tx->vin[vindex].prevout.n);
+            CScript blindingScript(CScript() << OP_RETURN << std::vector<unsigned char>(pcoin->tx->vin[vindex].prevout.hash.begin(), pcoin->tx->vin[vindex].prevout.hash.end()) << pcoin->tx->vin[vindex].prevout.n);
             CKey key;
             key = pwalletMain->GetBlindingKey(&blindingScript);
             AuditLogPrintf("%s : dumpissuanceblindingkey %s %s\n", getUser(), txid.GetHex(), request.params[1].getValStr());
@@ -1281,12 +1281,12 @@ UniValue importblindingkey(const JSONRPCRequest& request)
     return NullUniValue;
 }
 
-UniValue importissuanceblindingkey(const UniValue& params, bool fHelp)
+UniValue importissuanceblindingkey(const JSONRPCRequest& request)
 {
-    if (!EnsureWalletIsAvailable(fHelp))
+    if (!EnsureWalletIsAvailable(request.fHelp))
         return NullUniValue;
 
-    if (fHelp || params.size() != 3)
+    if (request.fHelp || request.params.size() != 3)
         throw runtime_error(
             "importissuanceblindingkey \"txid\" vin \"blindingkey\"\n"
             "\nImports a private blinding key in hex for an asset issuance."
@@ -1301,24 +1301,24 @@ UniValue importissuanceblindingkey(const UniValue& params, bool fHelp)
 
     LOCK2(cs_main, pwalletMain->cs_wallet);
 
-    if (!params[0].isStr() || !IsHex(params[0].get_str()) || params[0].get_str().size() != 64) {
+    if (!request.params[0].isStr() || !IsHex(request.params[0].get_str()) || request.params[0].get_str().size() != 64) {
         throw JSONRPCError(RPC_TYPE_ERROR, "First argument must be a txid string");
     }
-    std::string txidstr = params[0].get_str();
+    std::string txidstr = request.params[0].get_str();
     uint256 txid;
     txid.SetHex(txidstr);
 
     uint32_t vindex;
-    if (!params[1].isNum()) {
+    if (!request.params[1].isNum()) {
         throw JSONRPCError(RPC_TYPE_ERROR, "vin must be an integer");
     }
-    vindex = params[1].get_int();
+    vindex = request.params[1].get_int();
 
-    if (!params[2].isStr() || !IsHex(params[2].get_str()) || params[2].get_str().size() != 64) {
+    if (!request.params[2].isStr() || !IsHex(request.params[2].get_str()) || request.params[2].get_str().size() != 64) {
         throw JSONRPCError(RPC_TYPE_ERROR, "blinding key must be a hex string of length 64");
     }
 
-    std::vector<unsigned char> keydata = ParseHex(params[2].get_str());
+    std::vector<unsigned char> keydata = ParseHex(request.params[2].get_str());
     if (keydata.size() != 32) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid hexadecimal key length");
     }
@@ -1331,22 +1331,22 @@ UniValue importissuanceblindingkey(const UniValue& params, bool fHelp)
         if (pcoin->GetHash() != txid) {
             continue;
         }
-        if (pcoin->vin.size() <= vindex) {
+        if (pcoin->tx->vin.size() <= vindex) {
             throw JSONRPCError(RPC_WALLET_ERROR, "Transaction is in wallet but vin does not exist");
         }
-        if (pcoin->vin[vindex].assetIssuance.IsNull()) {
+        if (pcoin->tx->vin[vindex].assetIssuance.IsNull()) {
             throw JSONRPCError(RPC_WALLET_ERROR, "Transaction input has no issuance");
         }
 
         // Import the key in that slot
         uint256 keyval;
         memcpy(keyval.begin(), &keydata[0], 32);
-        CScript blindingScript(CScript() << OP_RETURN << std::vector<unsigned char>(pcoin->vin[vindex].prevout.hash.begin(), pcoin->vin[vindex].prevout.hash.end()) << pcoin->vin[vindex].prevout.n);
+        CScript blindingScript(CScript() << OP_RETURN << std::vector<unsigned char>(pcoin->tx->vin[vindex].prevout.hash.begin(), pcoin->tx->vin[vindex].prevout.hash.end()) << pcoin->tx->vin[vindex].prevout.n);
         if (!pwalletMain->AddSpecificBlindingKey(CScriptID(blindingScript), keyval)) {
             throw JSONRPCError(RPC_WALLET_ERROR, "Failed to import blinding key");
         }
         pwalletMain->MarkDirty();
-        AuditLogPrintf("%s : importissuanceblindingkey %s %s\n", getUser(), txid.GetHex(), params[1].getValStr());
+        AuditLogPrintf("%s : importissuanceblindingkey %s %s\n", getUser(), txid.GetHex(), request.params[1].getValStr());
         return NullUniValue;
     }
 
