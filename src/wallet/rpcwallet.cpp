@@ -3923,7 +3923,7 @@ UniValue listissuances(const JSONRPCRequest& request)
             + HelpExampleCli("listissuances", "<asset>")
             + HelpExampleRpc("listissuances", "<asset>")
         );
-    RPCTypeCheck(params, boost::assign::list_of(UniValue::VSTR));
+    RPCTypeCheck(request.params, boost::assign::list_of(UniValue::VSTR));
 
     LOCK2(cs_main, pwalletMain->cs_wallet);
 
