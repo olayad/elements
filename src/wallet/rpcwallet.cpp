@@ -492,7 +492,8 @@ static void SendGenerationTransaction(const CScript& assetScriptPubKey, const CP
     if (!pwalletMain->CreateTransaction(vecSend, wtxNew, vpChangeKey, nFeeRequired, nChangePosRet, strError, NULL, true, NULL, fBlindIssuances, &entropy, &reissuanceAsset, &reissuanceToken)) {
         throw JSONRPCError(RPC_WALLET_ERROR, strError);
     }
-    if (!pwalletMain->CommitTransaction(wtxNew, vpChangeKey))
+    CValidationState state;
+    if (!pwalletMain->CommitTransaction(wtxNew, vpChangeKey, g_connman.get(), state))
         throw JSONRPCError(RPC_WALLET_ERROR, "Error: The transaction was rejected! This might happen if some of the coins in your wallet were already spent, such as if you used a copy of the wallet and coins were spent in the copy but not marked as spent here.");
 }
 
@@ -3711,7 +3712,7 @@ UniValue claimpegin(const JSONRPCRequest& request)
     return finalTxn.GetHash().GetHex();
 }
 
-UniValue issueasset(const JSONRPCRequest& reques)
+UniValue issueasset(const JSONRPCRequest& request)
 {
     if (!EnsureWalletIsAvailable(request.fHelp))
         return NullUniValue;
@@ -3802,6 +3803,7 @@ UniValue issueasset(const JSONRPCRequest& reques)
     return ret;
 }
 
+UniValue dumpassetlabels(const JSONRPCRequest& request)
 {
     if (!EnsureWalletIsAvailable(request.fHelp))
         return NullUniValue;
