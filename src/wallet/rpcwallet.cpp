@@ -568,7 +568,7 @@ UniValue destroyamount(const JSONRPCRequest& request)
     SendMoney(destroyScript, nAmount, asset, false, confidentiality_pubkey, wtx);
 
     std::string blinds;
-    for (unsigned int i=0; i<wtx.vout.size(); i++) {
+    for (unsigned int i=0; i<wtx.tx->vout.size(); i++) {
         blinds += "blind:" + wtx.GetBlindingFactor(i).ToString() + "\n";
     }
     AuditLogPrintf("%s : destroyamount %s asset %s id %s txid:%s\nblinds:\n%s\n", getUser(), request.params[1].getValStr(), strasset, asset.GetHex(), wtx.GetHash().GetHex(), blinds);
