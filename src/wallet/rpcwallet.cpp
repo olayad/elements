@@ -3645,7 +3645,6 @@ static const CRPCCommand commands[] =
     { "hidden",             "resendwallettransactions", &resendwallettransactions, true,   {} },
     { "wallet",             "abandontransaction",       &abandontransaction,       false,  {"txid"} },
     { "wallet",             "addmultisigaddress",       &addmultisigaddress,       true,   {"nrequired","keys","account"} },
-    { "wallet",             "addassetlabel",            &addassetlabel,            true ,  {} },
     { "wallet",             "addwitnessaddress",        &addwitnessaddress,        true,   {"address"} },
     { "wallet",             "backupwallet",             &backupwallet,             true,   {"destination"} },
     { "wallet",             "dumpblindingkey",          &dumpblindingkey,          true,   {} },
