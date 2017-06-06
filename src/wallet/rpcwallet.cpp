@@ -3828,7 +3828,7 @@ UniValue issueasset(const JSONRPCRequest& request)
     CalculateReissuanceToken(token, entropy, fBlindIssuances);
 
     std::string blinds;
-    for (unsigned int i=0; i<wtx.vout.size(); i++) {
+    for (unsigned int i=0; i<wtx.tx->vout.size(); i++) {
         blinds += "blind:" + wtx.GetOutputBlindingFactor(i).ToString() + "\n";
         blinds += "assetblind:" + wtx.GetOutputAssetBlindingFactor(i).ToString() + "\n";
     }
@@ -3923,7 +3923,7 @@ UniValue reissueasset(const JSONRPCRequest& request)
     SendGenerationTransaction(GetScriptForDestination(assetAddr.Get()), assetKey, GetScriptForDestination(tokenAddr.Get()), tokenKey, nAmount, -1, true, entropy, asset, reissuanceToken, wtx);
 
     std::string blinds;
-    for (unsigned int i=0; i<wtx.vout.size(); i++) {
+    for (unsigned int i=0; i<wtx.tx->vout.size(); i++) {
         blinds += "blind:" + wtx.GetOutputBlindingFactor(i).ToString() + "\n";
         blinds += "assetblind:" + wtx.GetOutputAssetBlindingFactor(i).ToString() + "\n";
     }
