@@ -884,8 +884,8 @@ UniValue blindrawtransaction(const JSONRPCRequest& request)
     }
 
     std::vector<std::vector<unsigned char> > auxiliary_generators;
-    if (params.size() > 1) {
-        UniValue assetCommitments = params[1].get_array();
+    if (request.params.size() > 1) {
+        UniValue assetCommitments = request.params[1].get_array();
         if (assetCommitments.size() < tx.vin.size()) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Asset commitment array must have at least as many entries as transaction inputs.");
         }
