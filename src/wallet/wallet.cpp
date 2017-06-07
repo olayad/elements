@@ -2655,6 +2655,8 @@ bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount& nFeeRet, bool ov
         if (wtx.tx->wit.vtxoutwit.size() <= i) {
             break;
         }
+        // We want to re-add previously existing outwitnesses
+        // even though we don't create any new ones
         const CTxOutWitness& outwit = wtx.tx->wit.vtxoutwit[i];
         tx.wit.vtxoutwit.push_back(outwit);
     }
