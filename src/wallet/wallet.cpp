@@ -2647,13 +2647,15 @@ bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount& nFeeRet, bool ov
         return false;
 
     // Wipe outputs and output witness and re-add one by one
-    wtx.tx->wit.vtxoutwit.resize(wtx.vout.size());
     tx.vout.clear();
     tx.wit.vtxoutwit.clear();
     for (unsigned int i = 0; i < wtx.tx->vout.size(); i++) {
         const CTxOut& out = wtx.tx->vout[i];
-        const CTxOutWitness& outwit = wtx.tx->wit.vtxoutwit[i];
         tx.vout.push_back(out);
+        if (wtx.tx->wit.vtxoutwit.size() <= i) {
+            break;
+        }
+        const CTxOutWitness& outwit = wtx.tx->wit.vtxoutwit[i];
         tx.wit.vtxoutwit.push_back(outwit);
     }
 
@@ -2755,6 +2757,9 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
 
     {
         set<pair<const CWalletTx*,unsigned int> > setCoins;
+        // We need to store an unblinded and unsigned version of the transaction
+        // in case of !sign
+        CMutableTransaction txUnblindedAndUnsigned;
         LOCK2(cs_main, cs_wallet);
         {
             std::vector<COutput> vAvailableCoins;
@@ -3083,7 +3088,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                 }
 
                 // Keep a backup of transaction in case re-blinding necessary
-                CMutableTransaction txUnblindedAndUnsigned(txNew);
+                txUnblindedAndUnsigned = txNew;
                 CMutableTransaction txBackup(txNew);
                 int ret = BlindTransaction(input_blinds, input_asset_blinds, input_assets, input_amounts, output_blinds, output_asset_blinds,  output_pubkeys, vassetKeys, vtokenKeys, txNew);
                 // TODO remove?
