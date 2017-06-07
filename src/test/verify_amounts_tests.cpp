@@ -5,7 +5,7 @@
 #include "arith_uint256.h"
 #include "blind.h"
 #include "uint256.h"
-#include "main.h"
+#include "validation.h"
 
 #include "test/test_bitcoin.h"
 
