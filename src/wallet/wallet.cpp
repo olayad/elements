@@ -3226,6 +3226,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                 }
 
                 if (nFeeRet >= nFeeNeeded) {
+                    /* TODO Push actual blinding outside of loop and reactivate this logic
                     // Reduce fee to only the needed amount if we have change
                     // output to increase.  This prevents potential overpayment
                     // in fees if the coins selected to meet nFeeNeeded result
@@ -3241,10 +3242,10 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                         vector<CTxOut>::iterator change_position = txNew.vout.begin()+nChangePosInOut;
                         change_position->nValue = CConfidentialValue(change_position->nValue.GetAmount() + extraFeePaid);
                         nFeeRet -= extraFeePaid;
-                    }
+                    } */
                     break; // Done, enough fee included.
                 }
-
+                /* TODO Push actual blinding outside of loop and reactivate this logic
                 // Try to reduce change to include necessary fee
                 if (nChangePosInOut != -1 && nSubtractFeeFromAmount == 0) {
                     CAmount additionalFeeNeeded = nFeeNeeded - nFeeRet;
@@ -3255,7 +3256,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                         nFeeRet += additionalFeeNeeded;
                         break; // Done, able to increase fee from change
                     }
-                }
+                }*/
 
                 // Include more fee and try again.
                 nFeeRet = nFeeNeeded;
@@ -3263,6 +3264,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
             }
         }
 
+        // TODO Do actual blinding/caching here to allow for amount adjustments until end
         if (sign)
         {
             CTransaction txNewConst(txNew);
