@@ -2648,8 +2648,8 @@ bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount& nFeeRet, bool ov
 
     // Append fee output if any
     // This assumes fee is appended to end, and only one fee added by the CreateTransaction call
-    if (wtx.vout.back().IsFee()) {
-        tx.vout.push_back(wtx.vout.back());
+    if (wtx.tx->vout.back().IsFee()) {
+        tx.vout.push_back(wtx.tx->vout.back());
     }
 
     if (nChangePosInOut != -1) {
@@ -2657,7 +2657,7 @@ bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount& nFeeRet, bool ov
 
         // Insert change witness
         tx.wit.vtxoutwit.resize(tx.vout.size()-1);
-        tx.wit.vtxoutwit.insert(tx.wit.vtxoutwit.begin() + nChangePosInOut,  wtx.wit.vtxoutwit[nChangePosInOut]);
+        tx.wit.vtxoutwit.insert(tx.wit.vtxoutwit.begin() + nChangePosInOut,  wtx.tx->wit.vtxoutwit[nChangePosInOut]);
     }
 
     // Add new txins (keeping original txin scriptSig/order)
@@ -3216,6 +3216,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                 nIn++;
             }
         }
+        //TODO !sign -> remove blinding
 
         // Embed the constructed transaction data in wtxNew.
         wtxNew.SetTx(MakeTransactionRef(std::move(txNew)));
