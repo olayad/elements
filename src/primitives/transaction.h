@@ -642,6 +642,7 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
     unsigned char flags = 0;
     tx.vin.clear();
     tx.vout.clear();
+    tx.wit.SetNull();
     /* Try to read the vin. In case the dummy is there, this will be read as an empty vector. */
     s >> tx.vin;
     if (tx.vin.size() == 0 && fAllowWitness) {
@@ -658,11 +659,9 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
     if ((flags & 1) && fAllowWitness) {
         /* The witness flag is present, and we support witnesses. */
         flags ^= 1;
-        for (size_t i = 0; i < tx.vin.size(); i++) {
-            const_cast<CTxWitness*>(&tx.wit)->vtxinwit.resize(tx.vin.size());
-            const_cast<CTxWitness*>(&tx.wit)->vtxoutwit.resize(tx.vout.size());
-            s >> tx.wit;
-        }
+        const_cast<CTxWitness*>(&tx.wit)->vtxinwit.resize(tx.vin.size());
+        const_cast<CTxWitness*>(&tx.wit)->vtxoutwit.resize(tx.vout.size());
+        s >> tx.wit;
     }
     if (flags) {
         /* Unknown flag in the serialization */
@@ -695,11 +694,9 @@ inline void SerializeTransaction(const TxType& tx, Stream& s) {
     s << tx.vin;
     s << tx.vout;
     if (flags & 1) {
-        for (size_t i = 0; i < tx.vin.size(); i++) {
-            const_cast<CTxWitness*>(&tx.wit)->vtxinwit.resize(tx.vin.size());
-            const_cast<CTxWitness*>(&tx.wit)->vtxoutwit.resize(tx.vout.size());
-            s << tx.wit;
-        }
+        const_cast<CTxWitness*>(&tx.wit)->vtxinwit.resize(tx.vin.size());
+        const_cast<CTxWitness*>(&tx.wit)->vtxoutwit.resize(tx.vout.size());
+        s << tx.wit;
     }
     s << tx.nLockTime;
 }
