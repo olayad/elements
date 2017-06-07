@@ -58,7 +58,7 @@ public:
     }
     const CAsset& GetAsset() const
     {
-        assert(IsAsset() || IsAssetGeneration());
+        assert(IsAsset());
         return *reinterpret_cast<const CAsset*>(&vchAssetTag[1]);
     }
 
