@@ -3792,7 +3792,7 @@ std::vector<unsigned char> GenerateCoinbaseCommitment(CBlock& block, const CBloc
             block.vtx[0] = MakeTransactionRef(std::move(tx0));
             uint256 witnessroot = BlockWitnessMerkleRoot(block);
             CHash256().Write(witnessroot.begin(), 32).Write(&ret[0], 32).Finalize(witnessroot.begin());
-            CTxOut& out = tx0.vout.back();
+            CTxOut out;
             out.nValue = 0;
             out.nAsset = policyAsset;
             out.scriptPubKey.resize(38);
@@ -3805,7 +3805,7 @@ std::vector<unsigned char> GenerateCoinbaseCommitment(CBlock& block, const CBloc
             memcpy(&out.scriptPubKey[6], witnessroot.begin(), 32);
             commitment = std::vector<unsigned char>(out.scriptPubKey.begin(), out.scriptPubKey.end());
             CMutableTransaction tx(*block.vtx[0]);
-            tx.vout.push_back(out);
+            tx.vout[tx.vout.size()-1] = out;
             block.vtx[0] = MakeTransactionRef(std::move(tx));
         }
     }

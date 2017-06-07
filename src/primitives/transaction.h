@@ -807,12 +807,7 @@ public:
 
     bool HasWitness() const
     {
-        for (size_t i = 0; i < vin.size(); i++) {
-            if (!vin[i].scriptWitness.IsNull()) {
-                return true;
-            }
-        }
-        return false;
+        return !wit.IsNull();
     }
 };
 
@@ -856,12 +851,7 @@ struct CMutableTransaction
 
     bool HasWitness() const
     {
-        for (size_t i = 0; i < vin.size(); i++) {
-            if (!vin[i].scriptWitness.IsNull()) {
-                return true;
-            }
-        }
-        return false;
+        return !wit.IsNull();
     }
 };
 
