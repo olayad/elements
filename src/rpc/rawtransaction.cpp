@@ -778,8 +778,8 @@ UniValue rawblindrawtransaction(const JSONRPCRequest& request)
     UniValue inputAssetBlinds = request.params[4].get_array();
 
     bool fIgnoreBlindFail = true;
-    if (params.size() > 6) {
-        fIgnoreBlindFail = params[6].get_bool();
+    if (request.params.size() > 6) {
+        fIgnoreBlindFail = request.params[6].get_bool();
     }
 
     int n_blinded_ins = 0;

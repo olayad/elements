@@ -555,8 +555,8 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
     }
 
     bool fIgnoreBlindFail = true;
-    if (params.size() > 6)
-        fIgnoreBlindFail = params[6].get_bool();
+    if (request.params.size() > 6)
+        fIgnoreBlindFail = request.params[6].get_bool();
 
     CAsset asset = GetAssetFromString(strasset);
 
@@ -1134,8 +1134,9 @@ UniValue sendmany(const JSONRPCRequest& request)
     }
 
     bool fIgnoreBlindFail = true;
-    if (params.size() > 6)
-        fIgnoreBlindFail = params[6].get_bool();
+    if (request.params.size() > 6) {
+        fIgnoreBlindFail = request.params[6].get_bool();
+    }
 
     set<CBitcoinAddress> setAddress;
     vector<CRecipient> vecSend;

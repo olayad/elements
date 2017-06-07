@@ -3090,7 +3090,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                     input_assets.push_back(asset);
                     CAmount amount = coin.first->GetOutputValueOut(coin.second);
                     input_amounts.push_back(amount);
-                    if (coin.first->vout[coin.second].nValue.IsCommitment() || coin.first->vout[coin.second].nAsset.IsCommitment()) {
+                    if (coin.first->tx->vout[coin.second].nValue.IsCommitment() || coin.first->tx->vout[coin.second].nAsset.IsCommitment()) {
                         numInputsBlinded++;
                     }
                 }
