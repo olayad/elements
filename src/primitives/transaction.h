@@ -679,7 +679,7 @@ inline void SerializeTransaction(const TxType& tx, Stream& s) {
 
     unsigned char flags = 0;
     // Consistency check
-        assert(tx.wit.vtxoutwit.size() <= tx.vout.size());
+    assert(tx.wit.vtxoutwit.size() <= tx.vout.size());
     if (fAllowWitness) {
         /* Check whether witnesses need to be serialized. */
         if (tx.HasWitness()) {
@@ -727,8 +727,8 @@ public:
     // structure, including the hash.
     const int32_t nVersion;
     const std::vector<CTxIn> vin;
-
     const std::vector<CTxOut> vout;
+    const CTxWitness wit;
     const uint32_t nLockTime;
 
 private:
@@ -822,6 +822,7 @@ struct CMutableTransaction
     int32_t nVersion;
     std::vector<CTxIn> vin;
     std::vector<CTxOut> vout;
+    CTxWitness wit;
     uint32_t nLockTime;
 
     CMutableTransaction();
