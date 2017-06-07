@@ -682,7 +682,7 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
             if (val.IsNull() || asset.IsNull())
                 return false;
 
-                if (asset.IsAssetID()) {
+            if (asset.IsAssetID()) {
                 uint256 fixedAsset;
                 asset.GetAssetID(fixedAsset);
                 assert(secp256k1_generator_generate(secp256k1_ctx_verify_amounts, &gen, fixedAsset.begin()));
