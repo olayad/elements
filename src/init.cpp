@@ -1089,9 +1089,7 @@ bool AppInitParameterInteraction()
     }
 
     try {
-        if (mapMultiArgs.count("-assetdir")) {
-            InitGlobalAssetDir(mapMultiArgs.at("-assetdir"));
-        }
+        InitGlobalAssetDir(mapMultiArgs.count("-assetdir") > 0 ? mapMultiArgs.at("-assetdir") : std::vector<std::string>());
     } catch (const std::exception& e) {
         return InitError(strprintf("Error in -assetdir: %s\n", e.what()));
     }
