@@ -88,6 +88,9 @@ public:
  * signatureCache could be made local to VerifySignature.
 */
 static CSignatureCache signatureCache;
+
+static CSignatureCache rangeProofCache;
+
 }
 
 // To be called once in AppInit2/TestingSetup to initialize the signatureCache
@@ -98,6 +101,17 @@ void InitSignatureCache()
     size_t nMaxCacheSize = std::min(std::max((int64_t)0, GetArg("-maxsigcachesize", DEFAULT_MAX_SIG_CACHE_SIZE)), MAX_MAX_SIG_CACHE_SIZE) * ((size_t) 1 << 20);
     size_t nElems = signatureCache.setup_bytes(nMaxCacheSize);
     LogPrintf("Using %zu MiB out of %zu requested for signature cache, able to store %zu elements\n",
+            (nElems*sizeof(uint256)) >>20, nMaxCacheSize>>20, nElems);
+}
+
+// To be called once in AppInit2/TestingSetup to initialize the rangeproof cache
+void InitRangeproofCache()
+{
+    // nMaxCacheSize is unsigned. If -maxsigcachesize is set to zero,
+    // setup_bytes creates the minimum possible cache (2 elements).
+    size_t nMaxCacheSize = std::min(std::max((int64_t)0, GetArg("-maxsigcachesize", DEFAULT_MAX_SIG_CACHE_SIZE)), MAX_MAX_SIG_CACHE_SIZE) * ((size_t) 1 << 20);
+    size_t nElems = rangeProofCache.setup_bytes(nMaxCacheSize);
+    LogPrintf("Using %zu MiB out of %zu requested for rangeproof cache, able to store %zu elements\n",
             (nElems*sizeof(uint256)) >>20, nMaxCacheSize>>20, nElems);
 }
 
@@ -116,8 +130,6 @@ bool CachingTransactionSignatureChecker::VerifySignature(const std::vector<unsig
 
 bool CachingRangeProofChecker::VerifyRangeProof(const std::vector<unsigned char>& vchRangeProof, const std::vector<unsigned char>& vchValueCommitment, const std::vector<unsigned char>& vchAssetCommitment, const CScript& scriptPubKey, const secp256k1_context* secp256k1_ctx_verify_amounts) const
 {
-    static CSignatureCache rangeProofCache;
-
     CPubKey pubkey(vchValueCommitment);
     uint256 entry;
     rangeProofCache.ComputeEntry(entry, uint256(), vchRangeProof, pubkey, vchAssetCommitment, scriptPubKey);
