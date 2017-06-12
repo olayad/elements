@@ -60,5 +60,6 @@ public:
 };
 
 void InitSignatureCache();
+void InitRangeproofCache();
 
 #endif // BITCOIN_SCRIPT_SIGCACHE_H
