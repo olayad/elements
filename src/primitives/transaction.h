@@ -384,7 +384,6 @@ public:
     COutPoint prevout;
     CScript scriptSig;
     uint32_t nSequence;
-    CScriptWitness scriptWitness; //! Only serialized through CTransaction
     CAssetIssuance assetIssuance;
 
     /* Setting nSequence to this value for every input in a transaction
