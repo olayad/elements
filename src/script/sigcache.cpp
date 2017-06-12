@@ -91,6 +91,9 @@ static CSignatureCache signatureCache;
 
 static CSignatureCache rangeProofCache;
 
+static CSignatureCache surjectionProofCache;
+
+
 }
 
 // To be called once in AppInit2/TestingSetup to initialize the signatureCache
@@ -114,6 +117,18 @@ void InitRangeproofCache()
     LogPrintf("Using %zu MiB out of %zu requested for rangeproof cache, able to store %zu elements\n",
             (nElems*sizeof(uint256)) >>20, nMaxCacheSize>>20, nElems);
 }
+
+// To be called once in AppInit2/TestingSetup to initialize the surjectionrproof cache
+void InitSurjectionproofCache()
+{
+    // nMaxCacheSize is unsigned. If -maxsigcachesize is set to zero,
+    // setup_bytes creates the minimum possible cache (2 elements).
+    size_t nMaxCacheSize = std::min(std::max((int64_t)0, GetArg("-maxsigcachesize", DEFAULT_MAX_SIG_CACHE_SIZE)), MAX_MAX_SIG_CACHE_SIZE) * ((size_t) 1 << 20);
+    size_t nElems = surjectionProofCache.setup_bytes(nMaxCacheSize);
+    LogPrintf("Using %zu MiB out of %zu requested for surjectionproof cache, able to store %zu elements\n",
+            (nElems*sizeof(uint256)) >>20, nMaxCacheSize>>20, nElems);
+}
+
 
 bool CachingTransactionSignatureChecker::VerifySignature(const std::vector<unsigned char>& vchSig, const CPubKey& pubkey, const uint256& sighash) const
 {
@@ -169,8 +184,6 @@ bool CachingRangeProofChecker::VerifyRangeProof(const std::vector<unsigned char>
 
 bool CachingSurjectionProofChecker::VerifySurjectionProof(secp256k1_surjectionproof& proof, std::vector<secp256k1_generator>& vTags, secp256k1_generator& gen, const secp256k1_context* secp256k1_ctx_verify_amounts) const
 {
-    static CSignatureCache surjectionProofCache;
-
     // Serialize objects
     std::vector<unsigned char> vchproof;
     size_t proof_len = 0;
