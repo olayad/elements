@@ -390,7 +390,9 @@ void CreateCreditAndSpend(const CKeyStore& keystore, const CScript& outscript, C
     assert(input.vin[0] == inputm.vin[0]);
     assert(input.vout.size() == 1);
     assert(input.vout[0] == inputm.vout[0]);
-    assert(input.wit.vtxinwit[0].scriptWitness.stack == inputm.wit.vtxinwit[0].scriptWitness.stack);
+    // serialization round-trip blows away empty witnesses
+    assert(input.HasWitness() == inputm.HasWitness());
+    assert(!inputm.HasWitness() || (input.wit.vtxinwit[0].scriptWitness.stack == inputm.wit.vtxinwit[0].scriptWitness.stack));
 }
 
 void CheckWithFlag(const CTransactionRef& output, const CMutableTransaction& input, int flags, bool success)
