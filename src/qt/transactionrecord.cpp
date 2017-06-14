@@ -47,9 +47,9 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
         //
         // Credit
         //
-        for (unsigned int i = 0; i < wtx.vout.size(); i++)
+        for (unsigned int i = 0; i < wtx.tx->vout.size(); i++)
         {
-            const CTxOut& txout = wtx.vout[i];
+            const CTxOut& txout = wtx.tx->vout[i];
             isminetype mine = wallet->IsMine(txout);
             if(mine)
             {

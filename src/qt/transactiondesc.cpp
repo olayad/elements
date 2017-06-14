@@ -171,9 +171,9 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
             //
             // Debit
             //
-            for (unsigned int i = 0; i < wtx.vout.size(); i++)
+            for (unsigned int i = 0; i < wtx.tx->vout.size(); i++)
             {
-                const CTxOut& txout = wtx.vout[i];
+                const CTxOut& txout = wtx.tx->vout[i];
                 // Ignore change
                 isminetype toSelf = wallet->IsMine(txout);
                 if ((toSelf == ISMINE_SPENDABLE) && (fAllFromMe == ISMINE_SPENDABLE))
@@ -223,8 +223,8 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
             BOOST_FOREACH(const CTxIn& txin, wtx.tx->vin)
                 if (wallet->IsMine(txin))
                     strHTML += "<b>" + tr("Debit") + ":</b> " + BitcoinUnits::formatHtmlWithUnit(unit, -wallet->GetDebit(txin, ISMINE_ALL)[BITCOINID]) + "<br>";
-            for (unsigned int i = 0; i < wtx.vout.size(); i++)
-                if (wallet->IsMine(wtx.vout[i]) & ISMINE_ALL)
+            for (unsigned int i = 0; i < wtx.tx->vout.size(); i++)
+                if (wallet->IsMine(wtx.tx->vout[i]) & ISMINE_ALL)
                     strHTML += "<b>" + tr("Credit") + ":</b> " + BitcoinUnits::formatHtmlWithUnit(unit, wtx.GetOutputValueOut(i)) + "<br>";
         }
     }
@@ -278,8 +278,8 @@ QString TransactionDesc::toHTML(CWallet *wallet, CWalletTx &wtx, TransactionReco
         BOOST_FOREACH(const CTxIn& txin, wtx.tx->vin)
             if(wallet->IsMine(txin))
                 strHTML += "<b>" + tr("Debit") + ":</b> " + BitcoinUnits::formatHtmlWithUnit(unit, -wallet->GetDebit(txin, ISMINE_ALL)[BITCOINID]) + "<br>";
-        for (unsigned int i = 0; i < wtx.vout.size(); i++)
-            if(wallet->IsMine(wtx.vout[i]) & ISMINE_ALL)
+        for (unsigned int i = 0; i < wtx.tx->vout.size(); i++)
+            if(wallet->IsMine(wtx.tx->vout[i]) & ISMINE_ALL)
                 strHTML += "<b>" + tr("Credit") + ":</b> " + BitcoinUnits::formatHtmlWithUnit(unit, wtx.GetCredit(i)[BITCOINID]) + "<br>";
 
         strHTML += "<br><b>" + tr("Transaction") + ":</b><br>";
