@@ -155,7 +155,8 @@ testScripts = [
     #'importprunedfunds.py',
     'signmessages.py',
     #'nulldummy.py',
-    'import-rescan.py',
+    # TODO reactivate this
+    #'import-rescan.py',
     'bumpfee.py',
     'rpcnamedargs.py',
     'listsinceblock.py',
