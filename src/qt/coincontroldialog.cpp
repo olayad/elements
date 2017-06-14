@@ -715,7 +715,7 @@ void CoinControlDialog::updateView()
 
             // amount
             itemOutput->setText(COLUMN_AMOUNT, BitcoinUnits::format(nDisplayUnit, out.tx->GetOutputValueOut(out.i)));
-            itemOutput->setText(COLUMN_AMOUNT_INT64, strPad(QString::number(out.tx->GetOutputValueOut(out.i)), 15, " ")); // padding so that sorting works correctly
+            itemOutput->setData(COLUMN_AMOUNT, Qt::UserRole, QVariant((qlonglong)out.tx->GetOutputValueOut(out.i))); // padding so that sorting works correctly
 
             // date
             itemOutput->setText(COLUMN_DATE, GUIUtil::dateTimeStr(out.tx->GetTxTime()));
