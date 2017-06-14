@@ -3196,7 +3196,11 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                 for (auto& vin : txNew.vin) {
                     vin.scriptSig = CScript();
                 }
-                txNew.wit.vtxinwit.clear();
+
+                // Remove blinding as well if we're not actually signing
+                if (!sign) {
+                    txNew = txUnblindedAndUnsigned;
+                }
 
                 // Allow to override the default confirmation target over the CoinControl instance
                 int currentConfirmationTarget = nTxConfirmTarget;
