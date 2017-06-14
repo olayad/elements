@@ -119,7 +119,8 @@ testScripts = [
     'sendheaders.py',
     'zapwallettxes.py',
     'importmulti.py',
-    'mempool_limit.py',
+    # Mempool stuff different due to CT sizes
+    #'mempool_limit.py',
     'merkle_blocks.py',
     'receivedby.py',
     'abandonconflict.py',
