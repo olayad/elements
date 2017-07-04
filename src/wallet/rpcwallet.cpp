@@ -439,7 +439,7 @@ static void SendMoney(const CTxDestination &address, CAmount nValue, CAsset asse
     SendMoney(GetScriptForDestination(address), nValue, asset, fSubtractFeeFromAmount, confidentiality_key, wtxNew, fIgnoreBlindFail);
 }
 
-static void SendGenerationTransaction(const CScript& assetScriptPubKey, const CPubKey &assetKey, const CScript& tokenScriptPubKey, const CPubKey &tokenKey, CAmount nAmountAsset, CAmount nTokens, bool fBlindIssuances, uint256& entropy, CAsset& reissuanceAsset, CAsset& reissuanceToken, CWalletTx& wtxNew)
+static void SendGenerationTransaction(const CScript& assetScriptPubKey, const CPubKey &assetKey, const CScript& tokenScriptPubKey, const CPubKey &tokenKey, CAmount nAmountAsset, CAmount nTokens, bool fBlindIssuances, std::string assetName, uint256& entropy, CAsset& reissuanceAsset, CAsset& reissuanceToken, CWalletTx& wtxNew)
 {
 
     CAmount curBalance = pwalletMain->GetBalance()[reissuanceToken];
@@ -472,6 +472,12 @@ static void SendGenerationTransaction(const CScript& assetScriptPubKey, const CP
     if (assetScriptPubKey.size() > 0) {
         vecSend.push_back(recipient);
     }
+
+    if (!assetName.empty()) {
+        CScript marker = CScript(opcodetype::OP_RETURN) << std::vector<unsigned char>(assetName.begin(), assetName.end());
+        vecSend.push_back({marker, 0, GetAssetFromString("bitcoin"), CPubKey(), false});
+    }
+
     if (tokenScriptPubKey.size() > 0) {
         recipient = {tokenScriptPubKey, nTokens, CAsset(uint256S("2")), tokenKey, false};
         // We need to select the issuance token(s) to spend
@@ -3785,7 +3791,7 @@ UniValue issueasset(const JSONRPCRequest& request)
     if (!EnsureWalletIsAvailable(request.fHelp))
         return NullUniValue;
 
-    if (request.fHelp || request.params.size() < 2 || request.params.size() > 3)
+    if (request.fHelp || request.params.size() < 2 || request.params.size() > 4)
         throw runtime_error(
             "issueasset assetamount tokenamount ( blind )\n"
             "\nCreate an asset. Must have funds in wallet to do so. Returns asset hex id.\n"
@@ -3793,6 +3799,7 @@ UniValue issueasset(const JSONRPCRequest& request)
             "1. \"assetamount\"           (numeric or string, required) Amount of asset to generate.\n"
             "2. \"tokenamount\"           (numeric or string, required) Amount of reissuance tokens to generate. These will allow you to reissue the asset if in wallet using `reissueasset`. These tokens are not consumed during reissuance.\n"
             "3. \"blind\"                 (bool, optional, default=true) Whether to blind the issuances.\n"
+            "4. \"assetname\"             (string, optional, default=empty) Set a name for the asset.\n"
             "\nResult:\n"
             "{                        (json object)\n"
             "  \"txid\":\"<txid>\",   (string) Transaction id for issuance.\n"
@@ -3818,6 +3825,16 @@ UniValue issueasset(const JSONRPCRequest& request)
 
     if (!pwalletMain->IsLocked())
         pwalletMain->TopUpKeyPool();
+
+    std::string assetName = request.params.size() < 4 ? "" : request.params[3].get_str();
+    std::vector<unsigned char> assetNameBytes(assetName.begin(), assetName.end());
+    if (assetNameBytes.size() > MAX_OP_RETURN_RELAY - 3)
+        throw JSONRPCError(RPC_TYPE_ERROR, "The asset name should be maximum 80 characters");
+    for (unsigned char c : assetNameBytes)
+    {
+        if(c == 63)
+            throw JSONRPCError(RPC_TYPE_ERROR, "Invalid character in the asset name");
+    }
 
     // Generate a new key that is added to wallet
     CPubKey newKey;
@@ -3847,7 +3864,7 @@ UniValue issueasset(const JSONRPCRequest& request)
     CWalletTx wtx;
     uint256 dummyentropy;
     CAsset dummyasset;
-    SendGenerationTransaction(GetScriptForDestination(assetAddr.Get()), assetKey, GetScriptForDestination(tokenAddr.Get()), tokenKey, nAmount, nTokens, fBlindIssuances, dummyentropy, dummyasset, dummyasset, wtx);
+    SendGenerationTransaction(GetScriptForDestination(assetAddr.Get()), assetKey, GetScriptForDestination(tokenAddr.Get()), tokenKey, nAmount, nTokens, fBlindIssuances, assetName, dummyentropy, dummyasset, dummyasset, wtx);
 
     // Calculate asset type, assumes first vin is used for issuance
     uint256 entropy;
@@ -3953,7 +3970,7 @@ UniValue reissueasset(const JSONRPCRequest& request)
 
     // Attempt a send.
     CWalletTx wtx;
-    SendGenerationTransaction(GetScriptForDestination(assetAddr.Get()), assetKey, GetScriptForDestination(tokenAddr.Get()), tokenKey, nAmount, -1, true, entropy, asset, reissuanceToken, wtx);
+    SendGenerationTransaction(GetScriptForDestination(assetAddr.Get()), assetKey, GetScriptForDestination(tokenAddr.Get()), tokenKey, nAmount, -1, true, "",entropy, asset, reissuanceToken, wtx);
 
     std::string blinds;
     for (unsigned int i=0; i<wtx.tx->vout.size(); i++) {
