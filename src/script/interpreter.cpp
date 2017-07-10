@@ -9,6 +9,7 @@
 
 #include "primitives/bitcoin/transaction.h"
 #include "primitives/bitcoin/merkleblock.h"
+#include "consensus/merkle.h"
 #include "crypto/ripemd160.h"
 #include "crypto/sha1.h"
 #include "crypto/sha256.h"
@@ -18,6 +19,7 @@
 #include "pubkey.h"
 #include "script/script.h"
 #include "script/standard.h"
+#include "serialize.h"
 #include "streams.h"
 #include "uint256.h"
 #include "utilstrencodings.h"
@@ -1589,6 +1591,77 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
                             }
                         }
                     } // else...OP_NOP3
+                }
+                break;
+
+                case OP_CHECKMERKLEBRANCH:
+                case OP_CHECKMERKLEBRANCHVERIFY:
+                {
+                    // (proof leaf root -- bool)
+                    if (stack.size() < 3)
+                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+
+                    valtype& vchProof = stacktop(-3);
+                    valtype& vchLeaf  = stacktop(-2);
+                    valtype& vchRoot  = stacktop(-1);
+
+                    // The Merkle branch proof is a serialized 32-bit integer
+                    // followed by a serialized vector of uint256 hashes.
+                    CDataStream proofStream(vchProof, SER_NETWORK, PROTOCOL_VERSION);
+
+                    uint64_t nPathIn = 0;
+                    try {
+                        proofStream >> COMPACTSIZE(nPathIn);
+                    } catch (...) {
+                        return set_error(serror, SCRIPT_ERR_BAD_DECODE_ARG1);
+                    }
+                    if (nPathIn >> 32)
+                        return set_error(serror, SCRIPT_ERR_BAD_DECODE_ARG1);
+                    uint32_t nPath = static_cast<uint32_t>(nPathIn & 0xffffffff);
+
+                    std::vector<uint256> vMerkleBranch;
+                    vMerkleBranch.reserve(proofStream.size() / 32);
+                    try {
+                        proofStream >> vMerkleBranch;
+                    } catch (...) {
+                        return set_error(serror, SCRIPT_ERR_BAD_DECODE_ARG1);
+                    }
+
+                    if (!proofStream.empty())
+                        return set_error(serror, SCRIPT_ERR_BAD_DECODE_ARG1);
+
+                    size_t max = 0;
+                    for (int i = 0; i < 32; ++i)
+                        if (nPath & ((uint32_t)1)<<i)
+                            max = i + 1;
+                    if (max > vMerkleBranch.size())
+                        return set_error(serror, SCRIPT_ERR_BAD_DECODE_ARG1);
+
+                    // vchLeaf and vchRoot are both standard 32-byte hashes
+                    if (vchLeaf.size() != 32)
+                        return set_error(serror, SCRIPT_ERR_BAD_DECODE_ARG2);
+                    const uint256 leaf = uint256(vchLeaf);
+
+                    if (vchRoot.size() != 32)
+                        return set_error(serror, SCRIPT_ERR_BAD_DECODE_ARG3);
+                    const uint256 root = uint256(vchRoot);
+
+                    // Call ComputeFastMerkleRootFromBranch
+                    uint256 result = ComputeFastMerkleRootFromBranch(leaf, vMerkleBranch, nPath);
+
+                    const bool fSuccess = (result == root);
+
+                    popstack(stack); // root
+                    popstack(stack); // leaf
+                    popstack(stack); // proof
+                    stack.push_back(fSuccess ? vchTrue : vchFalse);
+                    if (opcode == OP_CHECKMERKLEBRANCHVERIFY)
+                    {
+                        if (fSuccess)
+                            popstack(stack);
+                        else
+                            return set_error(serror, SCRIPT_ERR_CHECKMERKLEBRANCHVERIFY);
+                    }
                 }
                 break;
 
