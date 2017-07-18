@@ -1591,8 +1591,10 @@ bool GetLockedOutputs(const uint256 &genesisHash, const CAmount &nAmount, std::v
 
     std::vector<std::pair<COutPoint, CAmount> > locksCreated;
     bool locksChanged = false;
-    if (!pblocktree->ReadLocksCreated(genesisHash, locksCreated))
-        return false;
+    // If this fails, we should still try to grab from mempool.
+    if (!pblocktree->ReadLocksCreated(genesisHash, locksCreated)) {
+        locksCreated.clear();
+    }
 
     //For faster random esasure
     std::list<std::pair<COutPoint, CAmount> > locksList;
@@ -1684,7 +1686,12 @@ bool GetLockedOutputs(const uint256 &genesisHash, const CAmount &nAmount, std::v
                 if (mempool.mapWithdrawsSpentToTxid.count(std::make_pair(withdrawGenHash, COutPoint(tx.GetHash(), j))))
                     continue;
 
-                if (txout.scriptPubKey.IsWithdrawLock() && txout.nValue.IsExplicit()) {
+                // Only written locks are filtered previously for invalid type
+                if (txout.nValue.IsCommitment() || txout.nAsset.IsCommitment() || txout.nAsset.GetAsset() != BITCOINID) {
+                    continue;
+                }
+
+                if (txout.scriptPubKey.IsWithdrawLock()) {
                     res.push_back(std::make_pair(COutPoint(tx.GetHash(), j), txout.nValue.GetAmount()));
                     nTotal += txout.nValue.GetAmount();
                     if (nTotal >= nAmount)
