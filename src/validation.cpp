@@ -976,6 +976,10 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
         if (secp256k1_surjectionproof_parse(secp256k1_ctx_verify_amounts, &proof, &ptxoutwit->vchSurjectionproof[0], ptxoutwit->vchSurjectionproof.size()) != 1)
             return false;
 
+        // Only verify proof against first n inputs it's proving against
+        size_t num_inputs_proved = secp256k1_surjectionproof_n_total_inputs(secp256k1_ctx_verify_amounts, &proof);
+        targetGenerators.resize(num_inputs_proved);
+
         if (!QueueCheck(pvChecks, new CSurjectionCheck(proof, targetGenerators, gen, cacheStore))) {
             return false;
         }
