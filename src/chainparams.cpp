@@ -140,7 +140,7 @@ public:
         nDefaultPort = 9042;
         nPruneAfterHeight = 100000;
 
-        parentGenesisBlockHash = uint256S("000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943");
+        parentGenesisBlockHash = uint256S("0x4b6f5d5f7d4fbc3cc1a901175a87141f457657f48e3544425333d854deaec894");
         CScript scriptDestination(CScript() << std::vector<unsigned char>(parentGenesisBlockHash.begin(), parentGenesisBlockHash.end()) << OP_WITHDRAWPROOFVERIFY);
         genesis = CreateGenesisBlock(consensus, strNetworkID, scriptDestination, 1231006505, genesisChallengeScript, 1, MAX_MONEY, 100, BITCOINID);
         consensus.hashGenesisBlock = genesis.GetHash();
@@ -171,8 +171,8 @@ public:
         base58Prefixes[EXT_PUBLIC_KEY] = boost::assign::list_of(0x04)(0x35)(0x87)(0xCF).convert_to_container<std::vector<unsigned char> >();
         base58Prefixes[EXT_SECRET_KEY] = boost::assign::list_of(0x04)(0x35)(0x83)(0x94).convert_to_container<std::vector<unsigned char> >();
 
-        base58Prefixes[PARENT_PUBKEY_ADDRESS] = std::vector<unsigned char>(1,111);
-        base58Prefixes[PARENT_SCRIPT_ADDRESS] = std::vector<unsigned char>(1,196);
+        base58Prefixes[PARENT_PUBKEY_ADDRESS] = std::vector<unsigned char>(1,0);//111);
+        base58Prefixes[PARENT_SCRIPT_ADDRESS] = std::vector<unsigned char>(1,5);//196);
     }
 };
 
