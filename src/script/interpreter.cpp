@@ -132,6 +132,11 @@ bool static IsCompressedPubKey(const valtype &vchPubKey) {
  * excessively padded (do not start with a 0 byte, unless an otherwise negative number follows,
  * in which case a single 0 byte is necessary and even required).
  * 
+ * <hashtype> can be multi-byte when bitmask signatures are used to control which inputs or
+ * outputs are signed. Each bitmask is one bit per input or output, with 7 bits per byte, up
+ * to the index of the last included input or output, respectfully. There isn't really a limit
+ * to how long these bitmasks can be, other than block size limits on the size of a transaction.
+ *
  * See https://bitcointalk.org/index.php?topic=8392.msg127623#msg127623
  *
  * This function is consensus-critical since BIP66.
@@ -146,31 +151,55 @@ bool static IsValidSignatureEncoding(const std::vector<unsigned char> &sig) {
     //   the start, except a single one when the next byte has its highest bit set).
     // * S-length: 1-byte length descriptor of the S value that follows.
     // * S: arbitrary-length big-endian encoded S value. The same rules apply.
-    // * sighash: 1-byte value indicating what data is hashed (not part of the DER
-    //   signature)
+    // * sighash: variable-length value indicating what data is hashed (not part of
+    //   the DER signature)
+
+    // We need one byte to read the sighash code.
+    if (sig.empty()) return false;
+
+    // Calculate length of sighash code
+    const int nBitmasks = !!(sig.back() & SIGHASH_SELECTINPUTS)
+                        + !!(sig.back() & SIGHASH_SELECTOUTPUTS);
+    auto itr = sig.rbegin() + 1;
+    unsigned int lenSigHash = 1;
+    for (int i = 0; i < nBitmasks; ++i, ++itr)
+    {
+        unsigned int lenMask = 1;
+        // Skip to last (first, since we're moving backwards) byte
+        // of the variable length bitmask field.
+        while (*itr & 0x80)
+        {
+            ++itr; ++lenMask;
+            // Don't go out of bounds
+            if (itr == sig.rend()) return false;
+        }
+        // Bitmasks must be minimally encoded
+        if (!(*itr) && (lenMask > 1)) return false;
+        lenSigHash += lenMask;
+    }
 
     // Minimum and maximum size constraints.
-    if (sig.size() < 9) return false;
-    if (sig.size() > 73) return false;
+    if (sig.size() < (8 + lenSigHash)) return false;
+    if (sig.size() > (72 + lenSigHash)) return false;
 
     // A signature is of type 0x30 (compound).
     if (sig[0] != 0x30) return false;
 
     // Make sure the length covers the entire signature.
-    if (sig[1] != sig.size() - 3) return false;
+    if (sig[1] != sig.size() - 2 - lenSigHash) return false;
 
     // Extract the length of the R element.
     unsigned int lenR = sig[3];
 
     // Make sure the length of the S element is still inside the signature.
-    if (5 + lenR >= sig.size()) return false;
+    if (4 + lenSigHash + lenR >= sig.size()) return false;
 
     // Extract the length of the S element.
     unsigned int lenS = sig[5 + lenR];
 
     // Verify that the length of the signature matches the sum of the length
     // of the elements.
-    if ((size_t)(lenR + lenS + 7) != sig.size()) return false;
+    if ((size_t)(lenR + lenS + 6 + lenSigHash) != sig.size()) return false;
  
     // Check whether the R element is an integer.
     if (sig[2] != 0x02) return false;
@@ -1928,14 +1957,77 @@ bool TransactionNoWithdrawsSignatureChecker::CheckSig(const vector<unsigned char
     if (!pubkey.IsValid())
         return false;
 
-    // Hash type is one byte tacked on to the end of the signature
+    // Hash type is one byte tacked on to the end of the signature,
+    // plus two optional variable-length bitmask fields.
     vector<unsigned char> vchSig(vchSigIn);
     if (vchSig.empty())
         return false;
     int nHashType = vchSig.back();
     vchSig.pop_back();
 
-    uint256 sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, sigversion, this->txdata);
+    std::vector<bool> vInMask;
+    std::vector<bool> vOutMask;
+
+    while (nHashType & SIGHASH_SELECTINPUTS) {
+        unsigned char nMask = vchSig.back();
+        vchSig.pop_back();
+        if (vchSig.empty())
+            return false;
+        for (int i = 0; i < 7; ++i)
+            vInMask.push_back((bool)(nMask & (1U << i)));
+        if (!(nMask & 0x80)) {
+            if (!nMask)
+                return false;
+            nHashType &= ~SIGHASH_SELECTINPUTS; // break;
+        }
+        while (vInMask.size() > txTo->vin.size()) {
+            if (vInMask.back())
+                return false;
+            vInMask.pop_back();
+        }
+        vInMask.resize(txTo->vin.size());
+    }
+
+    while (nHashType & SIGHASH_SELECTOUTPUTS) {
+        unsigned char nMask = vchSig.back();
+        vchSig.pop_back();
+        if (vchSig.empty())
+            return false;
+        for (int i = 0; i < 7; ++i)
+            vOutMask.push_back((bool)(nMask & (1U << i)));
+        if (!(nMask & 0x80)) {
+            if (!nMask)
+                return false;
+            nHashType &= ~SIGHASH_SELECTOUTPUTS; // break;
+        }
+        while (vOutMask.size() > txTo->vout.size()) {
+            if (vOutMask.back())
+                return false;
+            vOutMask.pop_back();
+        }
+        vOutMask.resize(txTo->vout.size());
+    }
+
+    CTransaction txNew(*txTo);
+    if (vInMask.size() || vOutMask.size()) {
+        CMutableTransaction txCopy(*txTo);
+        if (!vInMask[nIn])
+            return false; // MUST include input being signed
+        std::vector<CTxIn> vinNew;
+        for (size_t idx = 0; idx < vInMask.size(); ++idx)
+            if (vInMask[idx])
+                vinNew.push_back(txCopy.vin[idx]);
+        txCopy.vin.swap(vinNew);
+        std::vector<CTxOut> voutNew;
+        for (size_t idx = 0; idx < vOutMask.size(); ++idx)
+            if (vOutMask[idx])
+                voutNew.push_back(txCopy.vout[idx]);
+        txCopy.vout.swap(voutNew);
+        txNew.~CTransaction();
+        new(&txNew) CTransaction(txCopy);
+    }
+
+    uint256 sighash = SignatureHash(scriptCode, txNew, nIn, nHashType, amount, sigversion, this->txdata);
 
     if (!VerifySignature(vchSig, pubkey, sighash))
         return false;
