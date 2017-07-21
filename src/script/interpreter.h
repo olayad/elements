@@ -116,7 +116,7 @@ enum
 
     // Dirty hack to require a higher bar of bitcoin block confirmation in mempool
     //
-    SCRIPT_VERIFY_INCREASE_CONFIRMATIONS_REQUIRED = (1U << 17)
+    SCRIPT_VERIFY_INCREASE_CONFIRMATIONS_REQUIRED = (1U << 17),
 
     // Allow inputs or outputs of a transaction to be selectively signed
     // by means of a bitfield in the signature itself.
