@@ -25,6 +25,8 @@ enum
     SIGHASH_ALL = 1,
     SIGHASH_NONE = 2,
     SIGHASH_SINGLE = 3,
+    SIGHASH_SELECTINPUTS = 0x20,
+    SIGHASH_SELECTOUTPUTS = 0x40,
     SIGHASH_ANYONECANPAY = 0x80,
 };
 
@@ -115,6 +117,10 @@ enum
     // Dirty hack to require a higher bar of bitcoin block confirmation in mempool
     //
     SCRIPT_VERIFY_INCREASE_CONFIRMATIONS_REQUIRED = (1U << 17)
+
+    // Allow inputs or outputs of a transaction to be selectively signed
+    // by means of a bitfield in the signature itself.
+    SCRIPT_VERIFY_BITMASK_SIGNATURE = (1U << 18),
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError* serror);
