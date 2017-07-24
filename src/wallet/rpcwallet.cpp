@@ -475,7 +475,7 @@ static void SendGenerationTransaction(const CScript& assetScriptPubKey, const CP
 
     if (!assetName.empty()) {
         CScript marker = CScript(opcodetype::OP_RETURN) << std::vector<unsigned char>(assetName.begin(), assetName.end());
-        vecSend.push_back({marker, 0, GetAssetFromString("bitcoin"), CPubKey(), false});
+        vecSend.push_back({marker, 0, GetAssetFromString(BITCOINLABEL), CPubKey(), false});
     }
 
     if (tokenScriptPubKey.size() > 0) {
@@ -555,7 +555,7 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
     if (request.params.size() > 4)
         fSubtractFeeFromAmount = request.params[4].get_bool();
 
-    std::string strasset = "bitcoin";
+    std::string strasset = BITCOINLABEL;
     if (request.params.size() > 5 && request.params[5].isStr()) {
         strasset = request.params[5].get_str();
     }
@@ -1160,7 +1160,7 @@ UniValue sendmany(const JSONRPCRequest& request)
     {
         CBitcoinAddress address(name_);
 
-        std::string strasset = "bitcoin";
+        std::string strasset = BITCOINLABEL;
         if (!assets.isNull() && assets[name_].isStr()) {
             strasset = assets[name_].get_str();
         }
