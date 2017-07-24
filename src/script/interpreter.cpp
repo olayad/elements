@@ -245,7 +245,7 @@ bool static IsDefinedHashtypeSignature(const valtype &vchSig) {
     if (vchSig.size() == 0) {
         return false;
     }
-    unsigned char nHashType = vchSig[vchSig.size() - 1] & (~(SIGHASH_ANYONECANPAY));
+    unsigned char nHashType = vchSig[vchSig.size() - 1] & (~(SIGHASH_ANYONECANPAY | SIGHASH_SELECTINPUTS | SIGHASH_SELECTOUTPUTS));
     if (nHashType < SIGHASH_ALL || nHashType > SIGHASH_SINGLE)
         return false;
 
@@ -2008,26 +2008,37 @@ bool TransactionNoWithdrawsSignatureChecker::CheckSig(const vector<unsigned char
         vOutMask.resize(txTo->vout.size());
     }
 
+    unsigned int adjustedNIn = nIn;
     CTransaction txNew(*txTo);
     if (vInMask.size() || vOutMask.size()) {
         CMutableTransaction txCopy(*txTo);
-        if (!vInMask[nIn])
+        if (!vInMask[adjustedNIn])
             return false; // MUST include input being signed
         std::vector<CTxIn> vinNew;
+        std::vector<CTxInWitness> vtxinwitNew;
         for (size_t idx = 0; idx < vInMask.size(); ++idx)
-            if (vInMask[idx])
+            if (vInMask[idx]) {
+                if (idx == nIn) adjustedNIn = vinNew.size();
                 vinNew.push_back(txCopy.vin[idx]);
+                vtxinwitNew.push_back((idx < txCopy.wit.vtxinwit.size())? txCopy.wit.vtxinwit[idx]: CTxInWitness());
+            }
         txCopy.vin.swap(vinNew);
+        txCopy.wit.vtxinwit.swap(vtxinwitNew);
         std::vector<CTxOut> voutNew;
-        for (size_t idx = 0; idx < vOutMask.size(); ++idx)
-            if (vOutMask[idx])
+        std::vector<CTxOutWitness> vtxoutwitNew;
+        for (size_t idx = 0; idx < vOutMask.size(); ++idx) {
+            if (vOutMask[idx]) {
                 voutNew.push_back(txCopy.vout[idx]);
+                vtxoutwitNew.push_back((idx < txCopy.wit.vtxoutwit.size())? txCopy.wit.vtxoutwit[idx]: CTxOutWitness());
+            }
+        }
         txCopy.vout.swap(voutNew);
+        txCopy.wit.vtxoutwit.swap(vtxoutwitNew);
         txNew.~CTransaction();
         new(&txNew) CTransaction(txCopy);
     }
 
-    uint256 sighash = SignatureHash(scriptCode, txNew, nIn, nHashType, amount, sigversion, this->txdata);
+    uint256 sighash = SignatureHash(scriptCode, txNew, adjustedNIn, nHashType, amount, sigversion, this->txdata);
 
     if (!VerifySignature(vchSig, pubkey, sighash))
         return false;

@@ -3062,15 +3062,18 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     assert(pindexNew->pprev == chainActive.Tip());
     // Read block from disk.
     int64_t nTime1 = GetTimeMicros();
+    std::shared_ptr<const CBlock> pthisBlock;
     if (!pblock) {
         std::shared_ptr<CBlock> pblockNew = std::make_shared<CBlock>();
         connectTrace.blocksConnected.emplace_back(pindexNew, pblockNew);
         if (!ReadBlockFromDisk(*pblockNew, pindexNew, chainparams.GetConsensus()))
             return AbortNode(state, "Failed to read block");
+        pthisBlock = pblockNew;
     } else {
         connectTrace.blocksConnected.emplace_back(pindexNew, pblock);
+        pthisBlock = pblock;
     }
-    const CBlock& blockConnecting = *connectTrace.blocksConnected.back().second;
+    const CBlock& blockConnecting = *pthisBlock;
     // Apply the block atomically to the chain state.
     int64_t nTime2 = GetTimeMicros(); nTimeReadFromDisk += nTime2 - nTime1;
     int64_t nTime3;
@@ -3092,13 +3095,13 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
                     pblocktree->ReadInvalidBlockQueue(vinvalidBlocks);
                     bool blockAlreadyInvalid = false;
                     BOOST_FOREACH(uint256& hash, vinvalidBlocks) {
-                        if (hash == pblock->GetHash()) {
+                        if (hash == pthisBlock->GetHash()) {
                             blockAlreadyInvalid = true;
                             break;
                         }
                     }
                     if (!blockAlreadyInvalid) {
-                        vinvalidBlocks.push_back(pblock->GetHash());
+                        vinvalidBlocks.push_back(pthisBlock->GetHash());
                         pblocktree->WriteInvalidBlockQueue(vinvalidBlocks);
                     }
                 }
