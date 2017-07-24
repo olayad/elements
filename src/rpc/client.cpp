@@ -104,6 +104,8 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "sendrawtransaction", 1, "allowhighfees" },
     { "sendrawtransaction", 2, "allowunblindfails" },
     { "fundrawtransaction", 1, "options" },
+    { "makeoffer", 1, "sellamount" },
+    { "makeoffer", 3, "buyamount" },
     { "gettxout", 1, "n" },
     { "gettxout", 2, "include_mempool" },
     { "gettxoutproof", 0, "txids" },
