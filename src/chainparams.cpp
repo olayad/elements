@@ -145,7 +145,7 @@ public:
         genesis = CreateGenesisBlock(consensus, strNetworkID, scriptDestination, 1231006505, genesisChallengeScript, 1, MAX_MONEY, 100, BITCOINID);
         consensus.hashGenesisBlock = genesis.GetHash();
 
-        scriptCoinbaseDestination = CScript() << ParseHex("0229536c4c83789f59c30b93eb40d4abbd99b8dcc99ba8bd748f29e33c1d279e3c") << OP_CHECKSIG;
+        scriptCoinbaseDestination = CScript() << ParseHex("038cbd59ea89a20f7aeafcf9b907280ef186204e6dd64337284f8471e97c4eefc5") << OP_CHECKSIG;
         vFixedSeeds.clear(); //! TODO
         vSeeds.clear(); //! TODO
 
