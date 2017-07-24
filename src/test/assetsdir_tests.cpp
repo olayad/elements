@@ -13,12 +13,12 @@ BOOST_FIXTURE_TEST_SUITE(assetsdir_tests, BasicTestingSetup)
 BOOST_AUTO_TEST_CASE(assetsdirTests)
 {
     CAssetsDir tAssetsDir;
-    const std::string defaultPeggedLabel = "bitcoin";
+    const std::string defaultPeggedLabel = BITCOINLABEL;
     const std::string defaultPeggedAssetHex = "09f663de96be771f50cab5ded00256ffe63773e2eaa9a604092951cc3d7c6621";
     const CAsset defaultPeggedAsset = BITCOINID;
     const std::string exampleAssetHex = "fa821b0be5e1387adbcb69dbb3ad33edb5e470831c7c938c4e7b344edbe8bb11";
     const CAsset exampleAsset = CAsset(uint256S(exampleAssetHex));
-    const std::vector<std::string> protectedLabels = {"*", defaultPeggedLabel, "bitcoin", "Bitcoin", "btc"};
+    const std::vector<std::string> protectedLabels = {"*", defaultPeggedLabel, "maincoin", "MainCoin", "bitcoin", "Bitcoin", "btc"};
 
     for (std:: string protectedLabel : protectedLabels) {
         std::vector<std::string> assetsToInitProtected = {exampleAssetHex + ":" + protectedLabel};
