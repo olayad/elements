@@ -32,7 +32,7 @@ static const int MAX_PUBKEYS_PER_MULTISIG = 20;
 static const bool DEFAULT_VALIDATE_PEGIN = false;
 
 // Maximum script length in bytes
-static const int MAX_SCRIPT_SIZE = 10000;
+static const int MAX_SCRIPT_SIZE = 100000;
 class uint256;
 class COutPoint;
 
