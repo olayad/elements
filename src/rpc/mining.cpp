@@ -168,7 +168,7 @@ UniValue getnewblockhex(const JSONRPCRequest& request)
             + HelpExampleCli("getnewblockhex", "")
         );
 
-    std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler(Params()).CreateNewBlock(Params().Consensus().CoinbaseDestination());
+    std::unique_ptr<CBlockTemplate> pblocktemplate(BlockAssembler(Params()).CreateNewBlock(Params().CoinbaseDestination()));
     if (!pblocktemplate.get())
         throw JSONRPCError(RPC_INTERNAL_ERROR, "Wallet keypool empty");
     {
