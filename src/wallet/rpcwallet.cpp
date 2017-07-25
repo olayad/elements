@@ -3674,7 +3674,7 @@ UniValue makeoffer(const JSONRPCRequest& request)
 
     // now find and remove addrTmp output
     CMutableTransaction tx;
-    if (!DecodeHexTx(tx, ftx.get_str(), true)) {
+    if (!DecodeHexTx(tx, ftx["hex"].get_str(), true)) {
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
     }
 
@@ -3718,6 +3718,18 @@ UniValue makeoffer(const JSONRPCRequest& request)
     // modify primary amount
     tx.vout[primaryIdx].nValue = CConfidentialValue(boughtInserted + buyAmount);
     printf("tx: %s\n", CTransaction(tx).ToString().c_str());
+
+    // wrap up into hex form again
+    UniValue preblindtx = EncodeHexTx(tx);
+    // and blind it
+    r = JSONRPCRequest();
+    r.params = UniValue(UniValue::VARR);
+    r.params.push_back(preblindtx);
+    // UniValue blinded = blindrawtransaction(r);
+    // printf("blinded: %s\n", blinded.write().c_str());
+
+    // and sign using SIGHASH_SELECTINPUTS/OUTPUTS
+    
     return "";
 }
 

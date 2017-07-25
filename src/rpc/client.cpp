@@ -101,6 +101,8 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "createrawtransaction", 3, "output_assetids" },
     { "signrawtransaction", 1, "prevtxs" },
     { "signrawtransaction", 2, "privkeys" },
+    { "signrawtransaction", 4, "selectedinputs" },
+    { "signrawtransaction", 5, "selectedoutputs" },
     { "sendrawtransaction", 1, "allowhighfees" },
     { "sendrawtransaction", 2, "allowunblindfails" },
     { "fundrawtransaction", 1, "options" },

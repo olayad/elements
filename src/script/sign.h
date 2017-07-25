@@ -14,6 +14,115 @@ class CScript;
 class CTransaction;
 
 struct CMutableTransaction;
+class TransactionSignatureCreator;
+
+class SignSelect {
+public:
+    int nHashType;
+    std::vector<uint32_t> selectedInputs;
+    std::vector<uint32_t> selectedOutputs;
+
+    void SelectInput(std::vector<uint32_t> inputIndices)
+    {
+        selectedInputs.insert(selectedInputs.end(), inputIndices.begin(), inputIndices.end());
+    }
+
+    void SelectOutput(std::vector<uint32_t> outputIndices)
+    {
+        selectedOutputs.insert(selectedOutputs.end(), outputIndices.begin(), outputIndices.end());
+    }
+
+    bool HasInput(uint32_t inputIndex)
+    {
+        return std::find(selectedInputs.begin(), selectedInputs.end(), inputIndex) != selectedInputs.end();
+    }
+
+    bool HasOutput(uint32_t outputIndex)
+    {
+        return std::find(selectedOutputs.begin(), selectedOutputs.end(), outputIndex) != selectedOutputs.end();
+    }
+
+    void Write(std::vector<uint32_t> idx, std::vector<uint8_t>& buf) const
+    {
+        // serialize using utf-style bytes where the lower 7 bits are on/off toggles and the high 8th bit indicates whether
+        // there is more data or whether the selection is finished
+        if (idx.size() == 0) {
+            // 0 selected
+            buf.push_back(0);
+            return;
+        }
+        uint32_t max = idx[0];
+        for (uint32_t i = 1; i < idx.size(); i++) {
+            if (max < idx[i]) max = idx[i];
+        }
+        uint32_t bytes = 1 + max / 7;
+        uint8_t data[bytes];
+        memset(data, 0, bytes);
+        for (uint32_t i = 1; i < bytes; i++) {
+            data[i] |= 0x80;
+        }
+        for (uint32_t i = 0; i < idx.size(); i++) {
+            data[bytes - 1 - idx[i] / 7] |= 1 << (idx[i] % 7);
+        }
+        for (uint32_t i = 0; i < bytes; i++) {
+            buf.push_back(data[i]);
+        }
+    }
+
+    void Encode(std::vector<uint8_t>& s) const
+    {
+        if (nHashType & SIGHASH_SELECTOUTPUTS) {
+            Write(selectedOutputs, s);
+        }
+        if (nHashType & SIGHASH_SELECTINPUTS) {
+            Write(selectedInputs, s);
+        }
+        uint8_t ht = nHashType;
+        s.push_back(ht);
+    }
+
+    void Decode(std::vector<uint8_t>& v)
+    {
+        // clear up
+        selectedInputs.clear();
+        selectedOutputs.clear();
+        
+        size_t csr = v.size() - 1;
+
+        uint8_t ht = nHashType = v[csr--];
+        std::vector<uint32_t> selections;
+        if (ht & SIGHASH_SELECTINPUTS) {
+            // read input selections
+            uint32_t index = 0;
+            for (;;) {
+                uint8_t sel = v[csr--];
+                for (uint8_t i = 0; i < 7; i++) {
+                    if (sel & (1 << i)) selections.push_back(index);
+                    index++;
+                }
+                if (!(sel & 0x80)) break;
+            }
+            // register
+            SelectInput(selections);
+        }
+        if (ht & SIGHASH_SELECTOUTPUTS) {
+            // read output selections
+            uint32_t index = 0;
+            selections.clear();
+            for (;;) {
+                uint8_t sel = v[csr--];
+                for (uint8_t i = 0; i < 7; i++) {
+                    if (sel & (1 << i)) selections.push_back(index);
+                    index++;
+                }
+                if (!(sel & 0x80)) break;
+            }
+            // register
+            SelectOutput(selections);
+        }
+    }
+    CTransaction* ExtractSelection(const CTransaction* txTo, int& adjustedNIn);
+};
 
 /** Virtual base class for signature creators. */
 class BaseSignatureCreator {
@@ -37,9 +146,9 @@ class TransactionSignatureCreator : public BaseSignatureCreator {
     int nHashType;
     CConfidentialValue amount;
     const TransactionNoWithdrawsSignatureChecker checker;
-
+    SignSelect* signSelect;
 public:
-    TransactionSignatureCreator(const CKeyStore* keystoreIn, const CTransaction* txToIn, unsigned int nInIn, const CConfidentialValue& amountIn, int nHashTypeIn=SIGHASH_ALL);
+    TransactionSignatureCreator(const CKeyStore* keystoreIn, const CTransaction* txToIn, unsigned int nInIn, const CConfidentialValue& amountIn, int nHashTypeIn=SIGHASH_ALL, SignSelect* ss=NULL);
     const BaseSignatureChecker& Checker() const { return checker; }
     bool CreateSig(std::vector<unsigned char>& vchSig, const CKeyID& keyid, const CScript& scriptCode, SigVersion sigversion) const;
 };
@@ -48,7 +157,7 @@ class MutableTransactionSignatureCreator : public TransactionSignatureCreator {
     CTransaction tx;
 
 public:
-    MutableTransactionSignatureCreator(const CKeyStore* keystoreIn, const CMutableTransaction* txToIn, unsigned int nInIn, const CConfidentialValue& amount, int nHashTypeIn) : TransactionSignatureCreator(keystoreIn, &tx, nInIn, amount, nHashTypeIn), tx(*txToIn) {}
+    MutableTransactionSignatureCreator(const CKeyStore* keystoreIn, const CMutableTransaction* txToIn, unsigned int nInIn, const CConfidentialValue& amount, int nHashTypeIn, SignSelect* ss=NULL) : TransactionSignatureCreator(keystoreIn, &tx, nInIn, amount, nHashTypeIn, ss), tx(*txToIn) {}
 };
 
 /** A signature creator that just produces 72-byte empty signatures. */
