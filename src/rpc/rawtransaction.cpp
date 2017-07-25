@@ -1190,6 +1190,7 @@ UniValue signrawtransaction(const JSONRPCRequest& request)
             "       \"ALL|SELECTINPUTS|SELECTOUTPUTS\"\n"
             "5. \"selectedinputs\"  (array, required for sighashtype & SELECTINPUTS) array of indices for to-sign inputs\n"
             "6. \"selectedoutputs\" (array, required for sighashtype & SELECTOUTPUTS) array of indices for to-cover outputs\n"
+            "                       The selections may be omitted if all inputs and all outputs should be selected (an appendable transaction)\n"
 
             "\nResult:\n"
             "{\n"
@@ -1380,29 +1381,33 @@ UniValue signrawtransaction(const JSONRPCRequest& request)
     // CMutableTransaction selectedtx = CMutableTransaction(CTransaction(mergedTx));
     std::vector<uint32_t> sigMap; // maps indices in selectedtx to indices in mergedTx for migrating signatures later
     size_t selectionIndex = 4;
+    bool selectAll = false;
     if (nHashType & SIGHASH_SELECTINPUTS) {
         printf("selecting inputs\n");
         while (selectionIndex < 6 && request.params[selectionIndex].isNull()) {
             selectionIndex++;
         }
         if (selectionIndex == 6) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing selection for SIGHASH_SELECTINPUTS");
-        }
-        UniValue selectedInputs = request.params[selectionIndex++];
-        size_t six = selectedInputs.size();
-        size_t ii = 0;
-        for (uint32_t i = 0, realI = 0; realI < mergedTx.vin.size(); i++, realI++) {
-            if (ii >= six || selectedInputs[ii].get_int() > realI) {
-                // exclude
-                // selectedtx.vin.erase(selectedtx.vin.begin() + i);
-                // if (selectedtx.wit.vtxinwit.size() > i) {
-                //     selectedtx.wit.vtxinwit.erase(selectedtx.wit.vtxinwit.begin() + i);
-                // }
-                i--;
-            } else {
-                printf("including %u (%u)\n", ii, realI);
-                sigMap.push_back(realI);
-                ii++;
+            selectAll = true;
+            for (uint32_t i = 0; i < mergedTx.vin.size(); i++)
+                sigMap.push_back(i);
+        } else {
+            UniValue selectedInputs = request.params[selectionIndex++];
+            size_t six = selectedInputs.size();
+            size_t ii = 0;
+            for (uint32_t i = 0, realI = 0; realI < mergedTx.vin.size(); i++, realI++) {
+                if (ii >= six || selectedInputs[ii].get_int() > realI) {
+                    // exclude
+                    // selectedtx.vin.erase(selectedtx.vin.begin() + i);
+                    // if (selectedtx.wit.vtxinwit.size() > i) {
+                    //     selectedtx.wit.vtxinwit.erase(selectedtx.wit.vtxinwit.begin() + i);
+                    // }
+                    i--;
+                } else {
+                    printf("including %u (%u)\n", ii, realI);
+                    sigMap.push_back(realI);
+                    ii++;
+                }
             }
         }
         ss.SelectInput(sigMap);
@@ -1410,27 +1415,32 @@ UniValue signrawtransaction(const JSONRPCRequest& request)
     printf("sigmaps\n");
     for (uint32_t i : sigMap) printf("%u\n", i);
     if (nHashType & SIGHASH_SELECTOUTPUTS) {
-        while (selectionIndex < 6 && request.params[selectionIndex].isNull()) {
-            selectionIndex++;
-        }
-        if (selectionIndex == 6) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing selection for SIGHASH_SELECTOUTPUTS");
-        }
-        UniValue selectedOutputs = request.params[selectionIndex];
-        size_t sox = selectedOutputs.size();
-        size_t io = 0;
         std::vector<uint32_t> sel;
-        for (uint32_t i = 0, realI = 0; realI < mergedTx.vout.size(); i++, realI++) {
-            if (io >= sox || selectedOutputs[io].get_int() > realI) {
-                // exclude
-                // selectedtx.vout.erase(selectedtx.vout.begin() + i);
-                // if (selectedtx.wit.vtxoutwit.size() > i) {
-                //     selectedtx.wit.vtxoutwit.erase(selectedtx.wit.vtxoutwit.begin() + i);
-                // }
-                i--;
-            } else {
-                sel.push_back(realI);
-                io++;
+        if (selectAll) {
+            for (uint32_t i = 0; i < mergedTx.vout.size(); i++)
+                sel.push_back(i);
+        } else {
+            while (selectionIndex < 6 && request.params[selectionIndex].isNull()) {
+                selectionIndex++;
+            }
+            if (selectionIndex == 6) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing selection for SIGHASH_SELECTOUTPUTS");
+            }
+            UniValue selectedOutputs = request.params[selectionIndex];
+            size_t sox = selectedOutputs.size();
+            size_t io = 0;
+            for (uint32_t i = 0, realI = 0; realI < mergedTx.vout.size(); i++, realI++) {
+                if (io >= sox || selectedOutputs[io].get_int() > realI) {
+                    // exclude
+                    // selectedtx.vout.erase(selectedtx.vout.begin() + i);
+                    // if (selectedtx.wit.vtxoutwit.size() > i) {
+                    //     selectedtx.wit.vtxoutwit.erase(selectedtx.wit.vtxoutwit.begin() + i);
+                    // }
+                    i--;
+                } else {
+                    sel.push_back(realI);
+                    io++;
+                }
             }
         }
         ss.SelectOutput(sel);

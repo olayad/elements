@@ -3606,6 +3606,8 @@ extern UniValue sendrawtransaction(const JSONRPCRequest& request);
 
 UniValue createrawtransaction(const JSONRPCRequest& request);
 UniValue fundrawtransaction(const JSONRPCRequest& request);
+UniValue blindrawtransaction(const JSONRPCRequest& request);
+UniValue signrawtransaction(const JSONRPCRequest& request);
 
 UniValue makeoffer(const JSONRPCRequest& request)
 {
@@ -3641,6 +3643,9 @@ UniValue makeoffer(const JSONRPCRequest& request)
     std::string buyAsset = (request.params[2].get_str());
     CAsset sellCAsset = GetAssetFromString(sellAsset);
     CAsset buyCAsset = GetAssetFromString(buyAsset);
+    if (sellCAsset == BITCOINID || buyCAsset == BITCOINID) {
+        throw JSONRPCError(RPC_TYPE_ERROR, "offers with maincoin are not supported");
+    }
     CAmount sellAmount = AmountFromValue(request.params[1]);
     CAmount buyAmount = AmountFromValue(request.params[3]);
 
@@ -3672,11 +3677,60 @@ UniValue makeoffer(const JSONRPCRequest& request)
     printf("r = %s\n", r.params.write().c_str());
     UniValue ftx = fundrawtransaction(r);
 
-    // now find and remove addrTmp output
     CMutableTransaction tx;
     if (!DecodeHexTx(tx, ftx["hex"].get_str(), true)) {
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
     }
+    // nullify fee; we remove the fee output and sum up the maincoin out to
+    // go to our wallet; fees are paid by the taker of the offer
+
+    CAmount mainSum = 0;
+    int64_t mainOutIndex = -1;
+    int64_t feeIndex = -1;
+    for (size_t i = 0; i < tx.vout.size(); i++) {
+        if (tx.vout[i].nAsset.GetAsset() == BITCOINID) {
+            mainSum += tx.vout[i].nValue.GetAmount();
+            if (tx.vout[i].IsFee()) {
+                feeIndex = i;
+            } else {
+                mainOutIndex = i;
+            }
+        }
+    }
+    if (mainOutIndex > -1 && feeIndex > -1) {
+        // we have both main outs and fee outs; remove fee and update main
+        tx.vout.erase(tx.vout.begin() + feeIndex);
+        if (tx.wit.vtxoutwit.size() > feeIndex) {
+            tx.wit.vtxoutwit.erase(tx.wit.vtxoutwit.begin() + feeIndex);
+        }
+        tx.vout[mainOutIndex].nValue = CConfidentialValue(mainSum);
+    } else if (feeIndex > -1) {
+        // we have no main out but we do have a fee
+        UniValue addrFeeReroute = getnewaddress(JSONRPCRequest());
+        CBitcoinAddress feeReroute(addrFeeReroute.get_str());
+        tx.vout[feeIndex].scriptPubKey = GetScriptForDestination(feeReroute.Get());
+    } else {
+        printf("Warning: no fee/main indices found. This will probably go badly.\n");
+    }
+
+    // now find and remove addrTmp output
+
+    // CCoinControl coinControl;
+    // coinControl.destChange = destChange;
+    // coinControl.fAllowOtherInputs = true;
+    // coinControl.fAllowWatchOnly = includeWatching;
+    // coinControl.fOverrideFeeRate = overrideEstimatedFeeRate;
+    // coinControl.nFeeRate = specificFeeRate;
+    // 
+    // BOOST_FOREACH(const CTxIn& txin, tx.vin)
+    //     coinControl.Select(txin.prevout);
+    // 
+    // for (size_t i = 0; i < tx.vin.size(); i++) {
+    //     CTxIn txi = tx.vin[i];
+    //     CCoinsModifier coins = view.ModifyCoins(txi.prevout.hash);
+    //     CTxOut& prevout = coins->vout[txi.prevout.n];
+    //     
+    // }
 
     auto dst = GetScriptForDestination(baTmp.Get());
     bool found = false;
@@ -3725,12 +3779,19 @@ UniValue makeoffer(const JSONRPCRequest& request)
     r = JSONRPCRequest();
     r.params = UniValue(UniValue::VARR);
     r.params.push_back(preblindtx);
-    // UniValue blinded = blindrawtransaction(r);
-    // printf("blinded: %s\n", blinded.write().c_str());
+    UniValue blinded = blindrawtransaction(r);
+    printf("blinded: %s\n", blinded.write().c_str());
 
     // and sign using SIGHASH_SELECTINPUTS/OUTPUTS
-    
-    return "";
+    r = JSONRPCRequest();
+    r.params = UniValue(UniValue::VARR);
+    r.params.push_back(blinded);
+    r.params.push_back(UniValue(UniValue::VNULL));
+    r.params.push_back(UniValue(UniValue::VNULL));
+    r.params.push_back("ALL|SELECTINPUTS|SELECTOUTPUTS");
+    // we are selecting everything so no need to define which ins/outs
+    UniValue signedtx = signrawtransaction(r);
+    return signedtx;
 }
 
 unsigned int GetPeginTxnOutputIndex(const Sidechain::Bitcoin::CTransaction& txn, const CBitcoinAddress& sidechainAddress, unsigned char* fullcontract)
