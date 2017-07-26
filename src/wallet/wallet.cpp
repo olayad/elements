@@ -2606,9 +2606,9 @@ bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount& nFeeRet, bool ov
 {
     vector<CRecipient> vecSend;
     std::vector<CReserveKey> vChangeKey;
-    std::vector<CReserveKey*> vpChangeKey;
     std::set<CAsset> setAssets;
 
+    CPubKey vchPubKey;
     // Turn the txout set into a CRecipient vector
     for (size_t idx = 0; idx < tx.vout.size(); idx++)
     {
@@ -2626,14 +2626,12 @@ bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount& nFeeRet, bool ov
 
         if (setAssets.count(txOut.nAsset.GetAsset()) == 0) {
             vChangeKey.push_back(CReserveKey(this));
-            vpChangeKey.push_back(&vChangeKey[vChangeKey.size()-1]);
             setAssets.insert(txOut.nAsset.GetAsset());
         }
     }
     // Always add policyAsset, as fees via policyAsset may create change
     if (setAssets.count(policyAsset) == 0) {
         vChangeKey.push_back(CReserveKey(this));
-        vpChangeKey.push_back(&vChangeKey[vChangeKey.size()-1]);
     }
 
     CCoinControl coinControl;
@@ -2647,7 +2645,7 @@ bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount& nFeeRet, bool ov
         coinControl.Select(txin.prevout);
 
     CWalletTx wtx;
-    if (!CreateTransaction(vecSend, wtx, vpChangeKey, nFeeRet, nChangePosInOut, strFailReason, &coinControl, false))
+    if (!CreateTransaction(vecSend, wtx, vChangeKey, nFeeRet, nChangePosInOut, strFailReason, &coinControl, false))
         return false;
 
     // Wipe outputs and output witness and re-add one by one
@@ -2682,14 +2680,14 @@ bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount& nFeeRet, bool ov
 
     // optionally keep the change output key
     if (keepReserveKey) {
-        for (auto& changekey : vpChangeKey) {
-            changekey->KeepKey();
+        for (auto& changekey : vChangeKey) {
+            changekey.KeepKey();
         }
     }
     return true;
 }
 
-bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wtxNew, std::vector<CReserveKey*>& vpChangeKey, CAmount& nFeeRet,
+bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wtxNew, std::vector<CReserveKey>& vChangeKey, CAmount& nFeeRet,
                                 int& nChangePosInOut, std::string& strFailReason, const CCoinControl* coinControl, bool sign, std::vector<CAmount> *outAmounts, bool fBlindIssuances, const uint256* issuanceEntropy, const CAsset* reissuanceAsset, const CAsset* reissuanceToken, bool fIgnoreBlindFail)
 {
     // TODO re-enable to support multiple assets in a logical fashion, since the number of possible
@@ -2901,7 +2899,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                             // Reserve a new key pair from key pool
                             CPubKey vchPubKey;
                             bool ret;
-                            ret = vpChangeKey[changeCounter]->GetReservedKey(vchPubKey);
+                            ret = vChangeKey[changeCounter].GetReservedKey(vchPubKey);
                             if (!ret)
                             {
                                 strFailReason = _("Keypool ran out, please call keypoolrefill first");
@@ -2941,7 +2939,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                         {
                             nChangePosInOut = -1;
                             nFeeRet += it->second;
-                            vpChangeKey[changeCounter]->ReturnKey();
+                            vChangeKey[changeCounter].ReturnKey();
                         }
                         else
                         {
@@ -2971,7 +2969,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                         }
                     }
                     else
-                        vpChangeKey[changeCounter]->ReturnKey();
+                        vChangeKey[changeCounter].ReturnKey();
                     changeCounter++;
                 }
 
@@ -3338,7 +3336,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
 /**
  * Call after CreateTransaction unless you want to abort
  */
-bool CWallet::CommitTransaction(CWalletTx& wtxNew, std::vector<CReserveKey*>& reservekey, CConnman* connman, CValidationState& state)
+bool CWallet::CommitTransaction(CWalletTx& wtxNew, std::vector<CReserveKey>& reservekey, CConnman* connman, CValidationState& state)
 {
     {
         LOCK2(cs_main, cs_wallet);
@@ -3346,7 +3344,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, std::vector<CReserveKey*>& re
         {
             // Take key pair from key pool so it won't be used again
             for (auto&& key : reservekey)
-                key->KeepKey();
+                key.KeepKey();
 
             // Add tx to wallet, because if it has change it's also ours,
             // otherwise just for transaction history.
@@ -3892,6 +3890,7 @@ std::set<CTxDestination> CWallet::GetAccountAddresses(const std::string& strAcco
 
 bool CReserveKey::GetReservedKey(CPubKey& pubkey)
 {
+    LogPrintf("get reserved key: nIndex=%d\n", nIndex);
     if (nIndex == -1)
     {
         CKeyPool keypool;

@@ -18,10 +18,46 @@ using namespace std;
 
 typedef std::vector<unsigned char> valtype;
 
-TransactionSignatureCreator::TransactionSignatureCreator(const CKeyStore* keystoreIn, const CTransaction* txToIn, unsigned int nInIn, const CConfidentialValue& amountIn, int nHashTypeIn) : BaseSignatureCreator(keystoreIn), txTo(txToIn), nIn(nInIn), nHashType(nHashTypeIn), amount(amountIn), checker(txTo, nIn, amountIn) {}
+CTransaction* SignSelect::ExtractSelection(const CTransaction* txTo, int& adjustedNIn)
+{
+    CMutableTransaction tx = CMutableTransaction(*txTo);
+    std::vector<uint32_t>& si = selectedInputs;
+    std::vector<uint32_t>& so = selectedOutputs;
+    size_t six = si.size();
+    size_t sox = so.size();
+    size_t ii = 0;
+    size_t io = 0;
+    for (uint32_t i = 0, realI = 0; i < tx.vin.size(); i++, realI++) {
+        if (ii >= six || si[ii] > realI) {
+            // exclude
+            tx.vin.erase(tx.vin.begin() + i);
+            if (tx.wit.vtxinwit.size() > i) {
+                tx.wit.vtxinwit.erase(tx.wit.vtxinwit.begin() + i);
+            }
+            adjustedNIn -= adjustedNIn > i;     // nIn = 1; remove 0 -> 1 -= 1 > 0; nIn = 1; remove 1 -> 1 -= 1 > 1
+            i--;
+        } else ii++; // include
+    }
+    for (uint32_t i = 0, realI = 0; i < tx.vout.size(); i++, realI++) {
+        if (io >= sox || so[io] > realI) {
+            // exclude
+            tx.vout.erase(tx.vout.begin() + i);
+            if (tx.wit.vtxoutwit.size() > i) {
+                tx.wit.vtxoutwit.erase(tx.wit.vtxoutwit.begin() + i);
+            }
+            i--;
+        } else io++; // include
+    }
+    return new CTransaction(tx);
+}
+
+TransactionSignatureCreator::TransactionSignatureCreator(const CKeyStore* keystoreIn, const CTransaction* txToIn, unsigned int nInIn,
+    const CConfidentialValue& amountIn, int nHashTypeIn, SignSelect* ss)
+: BaseSignatureCreator(keystoreIn), txTo(txToIn), nIn(nInIn), nHashType(nHashTypeIn), amount(amountIn), checker(txTo, nIn, amountIn), signSelect(ss) {}
 
 bool TransactionSignatureCreator::CreateSig(std::vector<unsigned char>& vchSig, const CKeyID& address, const CScript& scriptCode, SigVersion sigversion) const
 {
+    printf("address keyID = %s\n", address.ToString().c_str());
     CKey key;
     if (!keystore->GetKey(address, key))
         return false;
@@ -30,10 +66,21 @@ bool TransactionSignatureCreator::CreateSig(std::vector<unsigned char>& vchSig, 
     if (sigversion == SIGVERSION_WITNESS_V0 && !key.IsCompressed())
         return false;
 
-    uint256 hash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, sigversion);
+    int adjustedNIn = nIn;
+    CTransaction* sigtx = NULL;
+    if (nHashType & (SIGHASH_SELECTOUTPUTS | SIGHASH_SELECTINPUTS))
+        sigtx = signSelect->ExtractSelection(txTo, adjustedNIn);
+
+    uint256 hash = SignatureHash(scriptCode, *(sigtx ?: txTo), adjustedNIn, nHashType & ~(SIGHASH_SELECTINPUTS | SIGHASH_SELECTOUTPUTS), amount, sigversion);
+    if (sigtx) delete sigtx;
     if (!key.Sign(hash, vchSig))
         return false;
-    vchSig.push_back((unsigned char)nHashType);
+    if (signSelect) {
+        signSelect->nHashType = nHashType;
+        signSelect->Encode(vchSig);
+    } else {
+        vchSig.push_back((unsigned char)nHashType);
+    }
     return true;
 }
 

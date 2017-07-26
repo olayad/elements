@@ -422,13 +422,13 @@ static void SendMoney(const CScript& scriptPubKey, CAmount nValue, CAsset asset,
     int nChangePosRet = -1;
     CRecipient recipient = {scriptPubKey, nValue, asset, confidentiality_key, fSubtractFeeFromAmount};
     vecSend.push_back(recipient);
-    if (!pwalletMain->CreateTransaction(vecSend, wtxNew, vpChangeKey, nFeeRequired, nChangePosRet, strError, NULL, true, NULL, true, NULL, NULL, NULL, fIgnoreBlindFail)) {
+    if (!pwalletMain->CreateTransaction(vecSend, wtxNew, vChangeKey, nFeeRequired, nChangePosRet, strError, NULL, true, NULL, true, NULL, NULL, NULL, fIgnoreBlindFail)) {
         if (!fSubtractFeeFromAmount && nValue + nFeeRequired > curBalance)
             strError = strprintf("Error: This transaction requires a transaction fee of at least %s", FormatMoney(nFeeRequired));
         throw JSONRPCError(RPC_WALLET_ERROR, strError);
     }
     CValidationState state;
-    if (!pwalletMain->CommitTransaction(wtxNew, vpChangeKey, g_connman.get(), state)) {
+    if (!pwalletMain->CommitTransaction(wtxNew, vChangeKey, g_connman.get(), state)) {
         strError = strprintf("Error: The transaction was rejected! Reason given: %s", state.GetRejectReason());
         throw JSONRPCError(RPC_WALLET_ERROR, strError);
     }
@@ -487,11 +487,11 @@ static void SendGenerationTransaction(const CScript& assetScriptPubKey, const CP
         }
         vecSend.push_back(recipient);
     }
-    if (!pwalletMain->CreateTransaction(vecSend, wtxNew, vpChangeKey, nFeeRequired, nChangePosRet, strError, NULL, true, NULL, fBlindIssuances, &entropy, &reissuanceAsset, &reissuanceToken)) {
+    if (!pwalletMain->CreateTransaction(vecSend, wtxNew, vChangeKey, nFeeRequired, nChangePosRet, strError, NULL, true, NULL, fBlindIssuances, &entropy, &reissuanceAsset, &reissuanceToken)) {
         throw JSONRPCError(RPC_WALLET_ERROR, strError);
     }
     CValidationState state;
-    if (!pwalletMain->CommitTransaction(wtxNew, vpChangeKey, g_connman.get(), state))
+    if (!pwalletMain->CommitTransaction(wtxNew, vChangeKey, g_connman.get(), state))
         throw JSONRPCError(RPC_WALLET_ERROR, "Error: The transaction was rejected! This might happen if some of the coins in your wallet were already spent, such as if you used a copy of the wallet and coins were spent in the copy but not marked as spent here.");
 }
 
@@ -1221,11 +1221,11 @@ UniValue sendmany(const JSONRPCRequest& request)
     CAmount nFeeRequired = 0;
     int nChangePosRet = -1;
     string strFailReason;
-    bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, vpChangeKey, nFeeRequired, nChangePosRet, strFailReason, NULL, true, NULL, false, NULL, NULL, NULL, fIgnoreBlindFail);
+    bool fCreated = pwalletMain->CreateTransaction(vecSend, wtx, vChangeKey, nFeeRequired, nChangePosRet, strFailReason, NULL, true, NULL, false, NULL, NULL, NULL, fIgnoreBlindFail);
     if (!fCreated)
         throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, strFailReason);
     CValidationState state;
-    if (!pwalletMain->CommitTransaction(wtx, vpChangeKey, g_connman.get(), state)) {
+    if (!pwalletMain->CommitTransaction(wtx, vChangeKey, g_connman.get(), state)) {
         strFailReason = strprintf("Transaction commit failed:: %s", state.GetRejectReason());
         throw JSONRPCError(RPC_WALLET_ERROR, strFailReason);
     }
@@ -3302,7 +3302,7 @@ UniValue bumpfee(const JSONRPCRequest& request)
     }
 
     // commit/broadcast the tx
-    std::vector<CReserveKey*> vpChangeKey;
+    std::vector<CReserveKey> vChangeKey;
     CWalletTx wtxBumped(pwalletMain, MakeTransactionRef(std::move(tx)));
     wtxBumped.mapValue = wtx.mapValue;
     wtxBumped.mapValue["replaces_txid"] = hash.ToString();
@@ -3311,7 +3311,7 @@ UniValue bumpfee(const JSONRPCRequest& request)
     wtxBumped.fTimeReceivedIsTxTime = true;
     wtxBumped.fFromMe = true;
     CValidationState state;
-    if (!pwalletMain->CommitTransaction(wtxBumped, vpChangeKey, g_connman.get(), state)) {
+    if (!pwalletMain->CommitTransaction(wtxBumped, vChangeKey, g_connman.get(), state)) {
         // NOTE: CommitTransaction never returns false, so this should never happen.
         throw JSONRPCError(RPC_WALLET_ERROR, strprintf("Error: The transaction was rejected! Reason given: %s", state.GetRejectReason()));
     }
@@ -3603,6 +3603,417 @@ UniValue sendtomainchain(const JSONRPCRequest& request)
 }
 
 extern UniValue sendrawtransaction(const JSONRPCRequest& request);
+
+UniValue createrawtransaction(const JSONRPCRequest& request);
+UniValue fundrawtransaction(const JSONRPCRequest& request);
+UniValue blindrawtransaction(const JSONRPCRequest& request);
+UniValue signrawtransaction(const JSONRPCRequest& request);
+
+UniValue makeoffer(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() < 4 || request.params.size() > 4)
+        throw std::runtime_error(
+            "makeoffer sellasset sellamount buyasset buyamount\n"
+            "\nCreate an offer which inserts sellamount of sellasset from the wallet and outputs buyamount of buyasset to the wallet.\n"
+            "\nResult:\n"
+            "\"hex\"                 (string) Hex of partial transaction (blinded and signed)\n"
+//             "\nExamples:\n"
+// //XXX: Fix the examples
+//             + HelpExampleCli("claimpegin", "\"2NEqRzqBst5rWrVx7SpwG37T17mvehLhKaN\", \"010000000151ef48c69a67700e6b30a4413eda4b631802c4514d7a09971dc12c703917e39f000000006c4730440220158c57dc3e80a826e4e348b7f530a9a9a3bb6b2913b089c03d08d0bdbf4e0d5b02201a8acf14cecbb74373894816fa69efa96e8f4e0ca633dcf99c99251200149c7b8323210214fd9d286f6aa8a7bdd043b1d5f3e3cdf754e9f1e50b65e5648704b01b2febb0acffffffff0100000000000000000000000000\" \"d50c8eec366e98b258414509d88e72ed0d2b24f63256e076d2b9d0ac3d55abc1\"")
+//             + HelpExampleRpc("claimpegin", "\"2NEqRzqBst5rWrVx7SpwG37T17mvehLhKaN\", \"010000000151ef48c69a67700e6b30a4413eda4b631802c4514d7a09971dc12c703917e39f000000006c4730440220158c57dc3e80a826e4e348b7f530a9a9a3bb6b2913b089c03d08d0bdbf4e0d5b02201a8acf14cecbb74373894816fa69efa96e8f4e0ca633dcf99c99251200149c7b8323210214fd9d286f6aa8a7bdd043b1d5f3e3cdf754e9f1e50b65e5648704b01b2febb0acffffffff0100000000000000000000000000\", \"d50c8eec366e98b258414509d88e72ed0d2b24f63256e076d2b9d0ac3d55abc1\"")
+        );
+
+    if (!IsHex(request.params[0].get_str())) {
+        throw JSONRPCError(RPC_TYPE_ERROR, "sellasset must be an asset ID");
+    }
+
+    if (!request.params[1].isNum()) {
+        throw JSONRPCError(RPC_TYPE_ERROR, "sellamount must be a number");
+    }
+
+    if (!IsHex(request.params[2].get_str())) {
+        throw JSONRPCError(RPC_TYPE_ERROR, "buyasset must be an asset ID");
+    }
+
+    if (!request.params[3].isNum()) {
+        throw JSONRPCError(RPC_TYPE_ERROR, "buyamount must be a number");
+    }
+
+    std::string sellAsset = (request.params[0].get_str());
+    std::string buyAsset = (request.params[2].get_str());
+    CAsset sellCAsset = GetAssetFromString(sellAsset);
+    CAsset buyCAsset = GetAssetFromString(buyAsset);
+    if (sellCAsset == BITCOINID || buyCAsset == BITCOINID) {
+        throw JSONRPCError(RPC_TYPE_ERROR, "offers with maincoin are not supported");
+    }
+    CAmount sellAmount = AmountFromValue(request.params[1]);
+    CAmount buyAmount = AmountFromValue(request.params[3]);
+
+    UniValue addrBuy = getnewaddress(JSONRPCRequest()); // bought asset
+    UniValue addrTmp = getnewaddress(JSONRPCRequest()); // sold asset to-be-deleted after funding
+    CBitcoinAddress baBuy(addrBuy.get_str());
+    CBitcoinAddress baTmp(addrTmp.get_str());
+
+    JSONRPCRequest r;
+    r.params = UniValue(UniValue::VARR);
+    r.params.push_back(UniValue(UniValue::VARR)); // [] (fund it later)
+    UniValue addrHash = UniValue(UniValue::VOBJ); // send to these addresses (map)
+    UniValue outputAssets = UniValue(UniValue::VOBJ); // asset specifications
+    // ret.push_back(Pair("txid", wtx.tx->GetHash().GetHex()));
+    addrHash.push_back(Pair(addrBuy.get_str(), ValueFromAmount(1))); // tiny amount of bought
+    outputAssets.push_back(Pair(addrBuy.get_str(), buyAsset));
+    addrHash.push_back(Pair(addrTmp.get_str(), ValueFromAmount(sellAmount))); // sold amount
+    outputAssets.push_back(Pair(addrTmp.get_str(), sellAsset));
+    r.params.push_back(addrHash);
+    r.params.push_back((int32_t)0);
+    r.params.push_back(outputAssets);
+    printf("r = %s\n", r.params.write().c_str());
+    UniValue rtx = createrawtransaction(r);
+
+    // fund it
+    r = JSONRPCRequest();
+    r.params = UniValue(UniValue::VARR);
+    r.params.push_back(rtx);
+    printf("r = %s\n", r.params.write().c_str());
+    UniValue ftx = fundrawtransaction(r);
+
+    CMutableTransaction tx;
+    if (!DecodeHexTx(tx, ftx["hex"].get_str(), true)) {
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
+    }
+    // nullify fee; we remove the fee output and sum up the maincoin out to
+    // go to our wallet; fees are paid by the taker of the offer
+
+    CAmount mainSum = 0;
+    int64_t mainOutIndex = -1;
+    int64_t feeIndex = -1;
+    for (size_t i = 0; i < tx.vout.size(); i++) {
+        if (tx.vout[i].nAsset.GetAsset() == BITCOINID) {
+            mainSum += tx.vout[i].nValue.GetAmount();
+            if (tx.vout[i].IsFee()) {
+                feeIndex = i;
+            } else {
+                mainOutIndex = i;
+            }
+        }
+    }
+    if (mainOutIndex > -1 && feeIndex > -1) {
+        // we have both main outs and fee outs; remove fee and update main
+        tx.vout.erase(tx.vout.begin() + feeIndex);
+        if (tx.wit.vtxoutwit.size() > feeIndex) {
+            tx.wit.vtxoutwit.erase(tx.wit.vtxoutwit.begin() + feeIndex);
+        }
+        tx.vout[mainOutIndex].nValue = CConfidentialValue(mainSum);
+    } else if (feeIndex > -1) {
+        // we have no main out but we do have a fee
+        UniValue addrFeeReroute = getnewaddress(JSONRPCRequest());
+        CBitcoinAddress feeReroute(addrFeeReroute.get_str());
+        tx.vout[feeIndex].scriptPubKey = GetScriptForDestination(feeReroute.Get());
+    } else {
+        printf("Warning: no fee/main indices found. This will probably go badly.\n");
+    }
+
+    // now find and remove addrTmp output
+
+    // CCoinControl coinControl;
+    // coinControl.destChange = destChange;
+    // coinControl.fAllowOtherInputs = true;
+    // coinControl.fAllowWatchOnly = includeWatching;
+    // coinControl.fOverrideFeeRate = overrideEstimatedFeeRate;
+    // coinControl.nFeeRate = specificFeeRate;
+    // 
+    // BOOST_FOREACH(const CTxIn& txin, tx.vin)
+    //     coinControl.Select(txin.prevout);
+    // 
+    // for (size_t i = 0; i < tx.vin.size(); i++) {
+    //     CTxIn txi = tx.vin[i];
+    //     CCoinsModifier coins = view.ModifyCoins(txi.prevout.hash);
+    //     CTxOut& prevout = coins->vout[txi.prevout.n];
+    //     
+    // }
+
+    auto dst = GetScriptForDestination(baTmp.Get());
+    bool found = false;
+    for (size_t i = 0; !found && i < tx.vout.size(); i++) {
+        if (tx.vout[i].scriptPubKey == dst) {
+            // got it
+            found = true;
+            tx.vout.erase(tx.vout.begin() + i);
+            if (tx.wit.vtxoutwit.size() > i) {
+                tx.wit.vtxoutwit.erase(tx.wit.vtxoutwit.begin() + i);
+            }
+        }
+    }
+    if (!found) throw std::runtime_error("failed to find temporary output");
+
+    // now find the outputs related to our bought asset; they will sum up to the amount we are putting in,
+    // and we will end up removing all but one and setting it to the sum + the bought amount
+    CAmount boughtInserted = 0;
+    size_t primaryIdx = 0;
+    size_t changeIdx = 0;
+    for (size_t i = 0; i < tx.vout.size(); i++) {
+        CTxOut txo = tx.vout[i];
+        if (txo.nAsset.GetAsset() == buyCAsset) {
+            if (boughtInserted > 0) {
+                changeIdx = i;
+            } else {
+                primaryIdx = i;
+            }
+            boughtInserted += txo.nValue.GetAmount();
+        }
+    }
+    // remove change, if any (we may have a perfect match)
+    if (changeIdx != primaryIdx) {
+        tx.vout.erase(tx.vout.begin() + changeIdx);
+        if (tx.wit.vtxoutwit.size() > changeIdx) {
+            tx.wit.vtxoutwit.erase(tx.wit.vtxoutwit.begin() + changeIdx);
+        }
+    }
+    // modify primary amount
+    tx.vout[primaryIdx].nValue = CConfidentialValue(boughtInserted + buyAmount);
+    printf("tx: %s\n", CTransaction(tx).ToString().c_str());
+
+    // wrap up into hex form again
+    UniValue preblindtx = EncodeHexTx(tx);
+
+    // before blinding, pull out commitments
+    char predata[1024];
+    char* pdp = predata;
+    assert(tx.vin.size() < 256);
+    pdp += sprintf(pdp, "%02x", tx.vin.size());
+    UniValue unspents = listunspent(JSONRPCRequest());
+    std::map<uint256,std::map<int,UniValue>> unspentMap;
+    for (size_t i = 0; i < unspents.size(); i++) {
+        UniValue utxo = unspents[i];
+        uint256 txid;
+        txid.SetHex(utxo["txid"].get_str());
+        printf("storing=%s.%u\n", txid.ToString().c_str(), utxo["vout"].get_int());
+        unspentMap[txid][utxo["vout"].get_int()] = utxo;
+    }
+    for (size_t i = 0; i < tx.vin.size(); i++) {
+        printf("fetching=%s.%u\n", tx.vin[i].prevout.hash.ToString().c_str(), tx.vin[i].prevout.n);
+        UniValue txlist = unspentMap[tx.vin[i].prevout.hash][tx.vin[i].prevout.n];
+        printf("got %s\n", txlist.write().c_str());
+        pdp += sprintf(pdp, "%s", txlist["assetcommitment"].get_str().c_str());
+    }
+
+    // and blind it
+    r = JSONRPCRequest();
+    r.params = UniValue(UniValue::VARR);
+    r.params.push_back(preblindtx);
+    UniValue blinded = blindrawtransaction(r);
+    printf("blinded: %s\n", blinded.write().c_str());
+
+    // and sign using SIGHASH_SELECTINPUTS/OUTPUTS
+    r = JSONRPCRequest();
+    r.params = UniValue(UniValue::VARR);
+    r.params.push_back(blinded);
+    r.params.push_back(UniValue(UniValue::VNULL));
+    r.params.push_back(UniValue(UniValue::VNULL));
+    r.params.push_back("ALL|SELECTINPUTS|SELECTOUTPUTS");
+    // we are selecting everything so no need to define which ins/outs
+    UniValue signedtx = signrawtransaction(r);
+    std::string result = predata + signedtx["hex"].get_str();
+    return result;
+}
+
+UniValue matchoffer(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() < 5 || request.params.size() > 5)
+        throw std::runtime_error(
+            "matchoffer sellasset sellamount buyasset buyamount partialtx\n"
+            "\nMatch an offer which inserts sellamount of sellasset from the wallet and outputs buyamount of buyasset to the wallet.\n"
+            "\nResult:\n"
+            "\"hex\"                 (string) Hex of completed transaction (blinded and signed)\n"
+//             "\nExamples:\n"
+// //XXX: Fix the examples
+//             + HelpExampleCli("claimpegin", "\"2NEqRzqBst5rWrVx7SpwG37T17mvehLhKaN\", \"010000000151ef48c69a67700e6b30a4413eda4b631802c4514d7a09971dc12c703917e39f000000006c4730440220158c57dc3e80a826e4e348b7f530a9a9a3bb6b2913b089c03d08d0bdbf4e0d5b02201a8acf14cecbb74373894816fa69efa96e8f4e0ca633dcf99c99251200149c7b8323210214fd9d286f6aa8a7bdd043b1d5f3e3cdf754e9f1e50b65e5648704b01b2febb0acffffffff0100000000000000000000000000\" \"d50c8eec366e98b258414509d88e72ed0d2b24f63256e076d2b9d0ac3d55abc1\"")
+//             + HelpExampleRpc("claimpegin", "\"2NEqRzqBst5rWrVx7SpwG37T17mvehLhKaN\", \"010000000151ef48c69a67700e6b30a4413eda4b631802c4514d7a09971dc12c703917e39f000000006c4730440220158c57dc3e80a826e4e348b7f530a9a9a3bb6b2913b089c03d08d0bdbf4e0d5b02201a8acf14cecbb74373894816fa69efa96e8f4e0ca633dcf99c99251200149c7b8323210214fd9d286f6aa8a7bdd043b1d5f3e3cdf754e9f1e50b65e5648704b01b2febb0acffffffff0100000000000000000000000000\", \"d50c8eec366e98b258414509d88e72ed0d2b24f63256e076d2b9d0ac3d55abc1\"")
+        );
+
+    if (!IsHex(request.params[0].get_str())) {
+        throw JSONRPCError(RPC_TYPE_ERROR, "sellasset must be an asset ID");
+    }
+
+    if (!request.params[1].isNum()) {
+        throw JSONRPCError(RPC_TYPE_ERROR, "sellamount must be a number");
+    }
+
+    if (!IsHex(request.params[2].get_str())) {
+        throw JSONRPCError(RPC_TYPE_ERROR, "buyasset must be an asset ID");
+    }
+
+    if (!request.params[3].isNum()) {
+        throw JSONRPCError(RPC_TYPE_ERROR, "buyamount must be a number");
+    }
+
+    std::string txinfo = request.params[4].get_str();
+    const char* tptr = txinfo.c_str();
+    const char* tstart = tptr;
+    // first pull out asset commitments
+    uint8_t count = tptr[0] >= '0' && tptr[0] <= '9' ? tptr[0] - '0' : tptr[0] + 10 - 'a';
+    count <<= 4;
+    count |= tptr[1] >= '0' && tptr[1] <= '9' ? tptr[1] - '0' : tptr[1] + 10 - 'a';
+    tptr += 2;
+    printf("%u asset commitments\n", count);
+    UniValue auxiliary_generators = UniValue(UniValue::VARR);
+    for (int i = 0; i < count; i++) {
+        char commitment[67];
+        commitment[66] = 0;
+        memcpy(commitment, tptr, 66);
+        tptr += 66;
+        auxiliary_generators.push_back(commitment);
+    }
+
+    CMutableTransaction intx;
+    if (!DecodeHexTx(intx, &txinfo[tptr-tstart], true)) {
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Initial TX decode failed");
+    }
+
+    std::string sellAsset = (request.params[0].get_str());
+    std::string buyAsset = (request.params[2].get_str());
+    CAsset sellCAsset = GetAssetFromString(sellAsset);
+    CAsset buyCAsset = GetAssetFromString(buyAsset);
+    if (sellCAsset == BITCOINID || buyCAsset == BITCOINID) {
+        throw JSONRPCError(RPC_TYPE_ERROR, "offers with maincoin are not supported");
+    }
+    CAmount sellAmount = AmountFromValue(request.params[1]);
+    CAmount buyAmount = AmountFromValue(request.params[3]);
+
+    UniValue addrBuy = getnewaddress(JSONRPCRequest()); // bought asset
+    UniValue addrTmp = getnewaddress(JSONRPCRequest()); // sold asset to-be-deleted after funding
+    CBitcoinAddress baBuy(addrBuy.get_str());
+    CBitcoinAddress baTmp(addrTmp.get_str());
+
+    JSONRPCRequest r;
+    r.params = UniValue(UniValue::VARR);
+    r.params.push_back(UniValue(UniValue::VARR)); // [] (fund it later)
+    UniValue addrHash = UniValue(UniValue::VOBJ); // send to these addresses (map)
+    UniValue outputAssets = UniValue(UniValue::VOBJ); // asset specifications
+    // ret.push_back(Pair("txid", wtx.tx->GetHash().GetHex()));
+    addrHash.push_back(Pair(addrBuy.get_str(), ValueFromAmount(1))); // tiny amount of bought
+    outputAssets.push_back(Pair(addrBuy.get_str(), buyAsset));
+    addrHash.push_back(Pair(addrTmp.get_str(), ValueFromAmount(sellAmount))); // sold amount
+    outputAssets.push_back(Pair(addrTmp.get_str(), sellAsset));
+    r.params.push_back(addrHash);
+    r.params.push_back((int32_t)0);
+    r.params.push_back(outputAssets);
+    printf("r = %s\n", r.params.write().c_str());
+    UniValue rtx = createrawtransaction(r);
+
+    // fund it
+    r = JSONRPCRequest();
+    r.params = UniValue(UniValue::VARR);
+    r.params.push_back(rtx);
+    printf("r = %s\n", r.params.write().c_str());
+    UniValue ftx = fundrawtransaction(r);
+
+    CMutableTransaction tx;
+    if (!DecodeHexTx(tx, ftx["hex"].get_str(), true)) {
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
+    }
+
+    // before blinding, pull out commitments
+    UniValue unspents = listunspent(JSONRPCRequest());
+    std::map<uint256,std::map<int,UniValue>> unspentMap;
+    for (size_t i = 0; i < unspents.size(); i++) {
+        UniValue utxo = unspents[i];
+        uint256 txid;
+        txid.SetHex(utxo["txid"].get_str());
+        printf("storing=%s.%u\n", txid.ToString().c_str(), utxo["vout"].get_int());
+        unspentMap[txid][utxo["vout"].get_int()] = utxo;
+    }
+
+    // now append tx to intx to get a completed transaction; we simultaneously create
+    // the selections for signing
+    UniValue selectedInputs(UniValue::VARR);
+    UniValue selectedOutputs(UniValue::VARR);
+    for (size_t i = 0; i < tx.vin.size(); i++) {
+        printf("fetching=%s.%u\n", tx.vin[i].prevout.hash.ToString().c_str(), tx.vin[i].prevout.n);
+        UniValue txlist = unspentMap[tx.vin[i].prevout.hash][tx.vin[i].prevout.n];
+        printf("got %s\n", txlist.write().c_str());
+        if (txlist["assetcommitment"].isNull()) {
+            auxiliary_generators.push_back("000000000000000000000000000000000000000000000000000000000000000000");
+        } else {
+            auxiliary_generators.push_back(txlist["assetcommitment"].get_str());
+        }
+        // pdp += sprintf(pdp, "%s", txlist["assetcommitment"].get_str().c_str());
+        selectedInputs.push_back((int64_t)intx.vin.size());
+        intx.vin.push_back(tx.vin[i]);
+    }
+    for (size_t i = 0; i < tx.vout.size(); i++) {
+        selectedOutputs.push_back((int64_t)intx.vout.size());
+        intx.vout.push_back(tx.vout[i]);
+    }
+    tx = intx;
+    printf("asset commitments: %s\n", auxiliary_generators.write().c_str());
+
+    // now find and remove addrTmp output
+
+    auto dst = GetScriptForDestination(baTmp.Get());
+    bool found = false;
+    for (size_t i = 0; !found && i < tx.vout.size(); i++) {
+        if (tx.vout[i].scriptPubKey == dst) {
+            // got it
+            found = true;
+            tx.vout.erase(tx.vout.begin() + i);
+            if (tx.wit.vtxoutwit.size() > i) {
+                tx.wit.vtxoutwit.erase(tx.wit.vtxoutwit.begin() + i);
+            }
+        }
+    }
+    if (!found) throw std::runtime_error("failed to find temporary output");
+
+    // now find the outputs related to our bought asset; they will sum up to the amount we are putting in,
+    // and we will end up removing all but one and setting it to the sum + the bought amount
+    CAmount boughtInserted = 0;
+    size_t primaryIdx = 0;
+    size_t changeIdx = 0;
+    for (size_t i = 0; i < tx.vout.size(); i++) {
+        CTxOut txo = tx.vout[i];
+        if (txo.nAsset.IsExplicit() && txo.nAsset.GetAsset() == buyCAsset) {
+            if (boughtInserted > 0) {
+                changeIdx = i;
+            } else {
+                primaryIdx = i;
+            }
+            boughtInserted += txo.nValue.GetAmount();
+        }
+    }
+    // remove change, if any (we may have a perfect match)
+    if (changeIdx != primaryIdx) {
+        tx.vout.erase(tx.vout.begin() + changeIdx);
+        if (tx.wit.vtxoutwit.size() > changeIdx) {
+            tx.wit.vtxoutwit.erase(tx.wit.vtxoutwit.begin() + changeIdx);
+        }
+    }
+    // modify primary amount
+    tx.vout[primaryIdx].nValue = CConfidentialValue(boughtInserted + buyAmount);
+    printf("tx: %s\n", CTransaction(tx).ToString().c_str());
+
+    // wrap up into hex form again
+    UniValue preblindtx = EncodeHexTx(tx);
+    // and blind it
+    r = JSONRPCRequest();
+    r.params = UniValue(UniValue::VARR);
+    r.params.push_back(preblindtx);
+    r.params.push_back(true);
+    r.params.push_back(auxiliary_generators);
+    UniValue blinded = blindrawtransaction(r);
+    printf("blinded: %s\n", blinded.write().c_str());
+
+    // and sign using SIGHASH_SELECTINPUTS/OUTPUTS
+    r = JSONRPCRequest();
+    r.params = UniValue(UniValue::VARR);
+    r.params.push_back(blinded);
+    r.params.push_back(UniValue(UniValue::VNULL));
+    r.params.push_back(UniValue(UniValue::VNULL));
+    r.params.push_back("ALL|SELECTINPUTS|SELECTOUTPUTS");
+    r.params.push_back(selectedInputs);
+    r.params.push_back(selectedOutputs);
+    UniValue signedtx = signrawtransaction(r);
+    return signedtx["hex"];
+}
 
 unsigned int GetPeginTxnOutputIndex(const Sidechain::Bitcoin::CTransaction& txn, const CBitcoinAddress& sidechainAddress, unsigned char* fullcontract)
 {
@@ -4180,6 +4591,8 @@ static const CRPCCommand commands[] =
     { "wallet",             "walletpassphrasechange",   &walletpassphrasechange,   true,   {"oldpassphrase","newpassphrase"} },
     { "wallet",             "walletpassphrase",         &walletpassphrase,         true,   {"passphrase","timeout"} },
     { "wallet",             "removeprunedfunds",        &removeprunedfunds,        true,   {"txid"} },
+    { "wallet",             "makeoffer",                &makeoffer,                true,   {"sellasset","sellamount","buyasset","buyamount"} },
+    { "wallet",             "matchoffer",               &matchoffer,               true,   {"sellasset","sellamount","buyasset","buyamount","partialtx"} },
 };
 
 void RegisterWalletRPCCommands(CRPCTable &t)
