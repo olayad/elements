@@ -108,6 +108,8 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "fundrawtransaction", 1, "options" },
     { "makeoffer", 1, "sellamount" },
     { "makeoffer", 3, "buyamount" },
+    { "matchoffer", 1, "sellamount" },
+    { "matchoffer", 3, "buyamount" },
     { "gettxout", 1, "n" },
     { "gettxout", 2, "include_mempool" },
     { "gettxoutproof", 0, "txids" },
