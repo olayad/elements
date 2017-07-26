@@ -1148,7 +1148,7 @@ static void TxInErrorToJSON(const CTxIn& txin, UniValue& vErrorsRet, const std::
 
 UniValue signrawtransaction(const JSONRPCRequest& request)
 {
-    if (request.fHelp || request.params.size() < 1 || request.params.size() > 4)
+    if (request.fHelp || request.params.size() < 1 || request.params.size() > 6)
         throw runtime_error(
             "signrawtransaction \"hexstring\" ( [{\"txid\":\"id\",\"vout\":n,\"scriptPubKey\":\"hex\",\"redeemScript\":\"hex\"},...] [\"privatekey1\",...] sighashtype )\n"
             "\nSign inputs for raw transaction (serialized, hex-encoded).\n"
@@ -1185,6 +1185,12 @@ UniValue signrawtransaction(const JSONRPCRequest& request)
             "       \"ALL|ANYONECANPAY\"\n"
             "       \"NONE|ANYONECANPAY\"\n"
             "       \"SINGLE|ANYONECANPAY\"\n"
+            "       \"ALL|SELECTINPUTS\"\n"
+            "       \"ALL|SELECTOUTPUTS\"\n"
+            "       \"ALL|SELECTINPUTS|SELECTOUTPUTS\"\n"
+            "5. \"selectedinputs\"  (array, required for sighashtype & SELECTINPUTS) array of indices for to-sign inputs\n"
+            "6. \"selectedoutputs\" (array, required for sighashtype & SELECTOUTPUTS) array of indices for to-cover outputs\n"
+            "                       The selections may be omitted if all inputs and all outputs should be selected (an appendable transaction)\n"
 
             "\nResult:\n"
             "{\n"
@@ -1354,6 +1360,9 @@ UniValue signrawtransaction(const JSONRPCRequest& request)
             (string("NONE|ANYONECANPAY"), int(SIGHASH_NONE|SIGHASH_ANYONECANPAY))
             (string("SINGLE"), int(SIGHASH_SINGLE))
             (string("SINGLE|ANYONECANPAY"), int(SIGHASH_SINGLE|SIGHASH_ANYONECANPAY))
+            (string("ALL|SELECTINPUTS"), int(SIGHASH_ALL|SIGHASH_SELECTINPUTS))
+            (string("ALL|SELECTOUTPUTS"), int(SIGHASH_ALL|SIGHASH_SELECTOUTPUTS))
+            (string("ALL|SELECTINPUTS|SELECTOUTPUTS"), int(SIGHASH_ALL|SIGHASH_SELECTINPUTS|SIGHASH_SELECTOUTPUTS))
             ;
         string strHashType = request.params[3].get_str();
         if (mapSigHashValues.count(strHashType))
@@ -1367,11 +1376,83 @@ UniValue signrawtransaction(const JSONRPCRequest& request)
     // Script verification errors
     UniValue vErrors(UniValue::VARR);
 
+    // Create selected transaction
+    SignSelect ss;
+    // CMutableTransaction selectedtx = CMutableTransaction(CTransaction(mergedTx));
+    std::vector<uint32_t> sigMap; // maps indices in selectedtx to indices in mergedTx for migrating signatures later
+    size_t selectionIndex = 4;
+    bool selectAll = false;
+    if (nHashType & SIGHASH_SELECTINPUTS) {
+        printf("selecting inputs\n");
+        while (selectionIndex < 6 && request.params[selectionIndex].isNull()) {
+            selectionIndex++;
+        }
+        if (selectionIndex == 6) {
+            selectAll = true;
+            for (uint32_t i = 0; i < mergedTx.vin.size(); i++)
+                sigMap.push_back(i);
+        } else {
+            UniValue selectedInputs = request.params[selectionIndex++];
+            size_t six = selectedInputs.size();
+            size_t ii = 0;
+            for (uint32_t i = 0, realI = 0; realI < mergedTx.vin.size(); i++, realI++) {
+                if (ii >= six || selectedInputs[ii].get_int() > realI) {
+                    // exclude
+                    // selectedtx.vin.erase(selectedtx.vin.begin() + i);
+                    // if (selectedtx.wit.vtxinwit.size() > i) {
+                    //     selectedtx.wit.vtxinwit.erase(selectedtx.wit.vtxinwit.begin() + i);
+                    // }
+                    i--;
+                } else {
+                    printf("including %u (%u)\n", ii, realI);
+                    sigMap.push_back(realI);
+                    ii++;
+                }
+            }
+        }
+        ss.SelectInput(sigMap);
+    }
+    printf("sigmaps\n");
+    for (uint32_t i : sigMap) printf("%u\n", i);
+    if (nHashType & SIGHASH_SELECTOUTPUTS) {
+        std::vector<uint32_t> sel;
+        if (selectAll) {
+            for (uint32_t i = 0; i < mergedTx.vout.size(); i++)
+                sel.push_back(i);
+        } else {
+            while (selectionIndex < 6 && request.params[selectionIndex].isNull()) {
+                selectionIndex++;
+            }
+            if (selectionIndex == 6) {
+                throw JSONRPCError(RPC_INVALID_PARAMETER, "Missing selection for SIGHASH_SELECTOUTPUTS");
+            }
+            UniValue selectedOutputs = request.params[selectionIndex];
+            size_t sox = selectedOutputs.size();
+            size_t io = 0;
+            for (uint32_t i = 0, realI = 0; realI < mergedTx.vout.size(); i++, realI++) {
+                if (io >= sox || selectedOutputs[io].get_int() > realI) {
+                    // exclude
+                    // selectedtx.vout.erase(selectedtx.vout.begin() + i);
+                    // if (selectedtx.wit.vtxoutwit.size() > i) {
+                    //     selectedtx.wit.vtxoutwit.erase(selectedtx.wit.vtxoutwit.begin() + i);
+                    // }
+                    i--;
+                } else {
+                    sel.push_back(realI);
+                    io++;
+                }
+            }
+        }
+        ss.SelectOutput(sel);
+    }
+
     // Use CTransaction for the constant parts of the
     // transaction to avoid rehashing.
     const CTransaction txConst(mergedTx);
     // Sign what we can:
+    bool selecting = sigMap.size() > 0;
     for (unsigned int i = 0; i < mergedTx.vin.size(); i++) {
+        if (selecting && !ss.HasInput(i)) continue;
         CTxIn& txin = mergedTx.vin[i];
         const CCoins* coins = view.AccessCoins(txin.prevout.hash);
         if (coins == NULL || !coins->IsAvailable(txin.prevout.n)) {
@@ -1384,7 +1465,7 @@ UniValue signrawtransaction(const JSONRPCRequest& request)
         SignatureData sigdata;
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
         if (!fHashSingle || (i < mergedTx.vout.size()))
-            ProduceSignature(MutableTransactionSignatureCreator(&keystore, &mergedTx, i, amount, nHashType), prevPubKey, sigdata);
+            ProduceSignature(MutableTransactionSignatureCreator(&keystore, &mergedTx, i, amount, nHashType, selecting ? &ss : NULL), prevPubKey, sigdata);
 
         // ... and merge in other signatures:
         BOOST_FOREACH(const CMutableTransaction& txv, txVariants) {
@@ -1399,11 +1480,24 @@ UniValue signrawtransaction(const JSONRPCRequest& request)
         if (!VerifyScript(txin.scriptSig, prevPubKey, (mergedTx.wit.vtxinwit.size() > i) ? &mergedTx.wit.vtxinwit[i].scriptWitness : NULL, STANDARD_SCRIPT_VERIFY_FLAGS, TransactionNoWithdrawsSignatureChecker(&txConst, i, amount), &serror)) {
             TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));
         }
+
+        // if (sigMap.size() > 0) { // <= 0 --> no selecting of inputs
+        //     // migrate signature into mergedTx
+        //     uint32_t realIdx = sigMap[i];
+        //     mergedTx.vin[realIdx].scriptSig = mergedTx.vin[i].scriptSig;
+        //     if (mergedTx.wit.vtxinwit.size() > i) {
+        //         // TODO: define if ok to assume mergedTx also has witties
+        //         mergedTx.wit.vtxinwit[realIdx] = mergedTx.wit.vtxinwit[i];
+        //     }
+        // }
     }
     bool fComplete = vErrors.empty();
 
     UniValue result(UniValue::VOBJ);
     result.push_back(Pair("hex", EncodeHexTx(mergedTx)));
+    if (selecting) {
+        result.push_back(Pair("partial", true));
+    }
     result.push_back(Pair("complete", fComplete));
     if (!vErrors.empty()) {
         result.push_back(Pair("errors", vErrors));
