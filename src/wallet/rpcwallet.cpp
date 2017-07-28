@@ -3662,8 +3662,8 @@ UniValue makeoffer(const JSONRPCRequest& request)
     // ret.push_back(Pair("txid", wtx.tx->GetHash().GetHex()));
     addrHash.push_back(Pair(addrBuy.get_str(), ValueFromAmount(1))); // tiny amount of bought
     outputAssets.push_back(Pair(addrBuy.get_str(), buyAsset));
-    addrHash.push_back(Pair(addrTmp.get_str(), ValueFromAmount(sellAmount))); // sold amount
-    outputAssets.push_back(Pair(addrTmp.get_str(), sellAsset));
+    // addrHash.push_back(Pair(addrTmp.get_str(), ValueFromAmount(sellAmount))); // sold amount
+    // outputAssets.push_back(Pair(addrTmp.get_str(), sellAsset));
     r.params.push_back(addrHash);
     r.params.push_back((int32_t)0);
     r.params.push_back(outputAssets);
@@ -3681,106 +3681,92 @@ UniValue makeoffer(const JSONRPCRequest& request)
     if (!DecodeHexTx(tx, ftx["hex"].get_str(), true)) {
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
     }
-    // nullify fee; we remove the fee output and sum up the maincoin out to
-    // go to our wallet; fees are paid by the taker of the offer
 
-    CAmount mainSum = 0;
-    int64_t mainOutIndex = -1;
-    int64_t feeIndex = -1;
-    for (size_t i = 0; i < tx.vout.size(); i++) {
-        if (tx.vout[i].nAsset.GetAsset() == BITCOINID) {
-            mainSum += tx.vout[i].nValue.GetAmount();
-            if (tx.vout[i].IsFee()) {
-                feeIndex = i;
-            } else {
-                mainOutIndex = i;
-            }
-        }
-    }
-    if (mainOutIndex > -1 && feeIndex > -1) {
-        // we have both main outs and fee outs; remove fee and update main
-        tx.vout.erase(tx.vout.begin() + feeIndex);
-        if (tx.wit.vtxoutwit.size() > feeIndex) {
-            tx.wit.vtxoutwit.erase(tx.wit.vtxoutwit.begin() + feeIndex);
-        }
-        tx.vout[mainOutIndex].nValue = CConfidentialValue(mainSum);
-    } else if (feeIndex > -1) {
-        // we have no main out but we do have a fee
-        UniValue addrFeeReroute = getnewaddress(JSONRPCRequest());
-        CBitcoinAddress feeReroute(addrFeeReroute.get_str());
-        tx.vout[feeIndex].scriptPubKey = GetScriptForDestination(feeReroute.Get());
-    } else {
-        printf("Warning: no fee/main indices found. This will probably go badly.\n");
-    }
+    // // nullify fee; we remove the fee output and sum up the maincoin out to
+    // // go to our wallet; fees are paid by the taker of the offer
+    // 
+    // CAmount mainSum = 0;
+    // int64_t mainOutIndex = -1;
+    // int64_t feeIndex = -1;
+    // for (size_t i = 0; i < tx.vout.size(); i++) {
+    //     if (tx.vout[i].nAsset.GetAsset() == BITCOINID) {
+    //         mainSum += tx.vout[i].nValue.GetAmount();
+    //         if (tx.vout[i].IsFee()) {
+    //             feeIndex = i;
+    //         } else {
+    //             mainOutIndex = i;
+    //         }
+    //     }
+    // }
+    // if (mainOutIndex > -1 && feeIndex > -1) {
+    //     // we have both main outs and fee outs; remove fee and update main
+    //     tx.vout.erase(tx.vout.begin() + feeIndex);
+    //     if (tx.wit.vtxoutwit.size() > feeIndex) {
+    //         tx.wit.vtxoutwit.erase(tx.wit.vtxoutwit.begin() + feeIndex);
+    //     }
+    //     tx.vout[mainOutIndex].nValue = CConfidentialValue(mainSum);
+    // } else if (feeIndex > -1) {
+    //     // we have no main out but we do have a fee
+    //     UniValue addrFeeReroute = getnewaddress(JSONRPCRequest());
+    //     CBitcoinAddress feeReroute(addrFeeReroute.get_str());
+    //     tx.vout[feeIndex].scriptPubKey = GetScriptForDestination(feeReroute.Get());
+    // } else {
+    //     printf("Warning: no fee/main indices found. This will probably go badly.\n");
+    // }
 
     // now find and remove addrTmp output
 
-    // CCoinControl coinControl;
-    // coinControl.destChange = destChange;
-    // coinControl.fAllowOtherInputs = true;
-    // coinControl.fAllowWatchOnly = includeWatching;
-    // coinControl.fOverrideFeeRate = overrideEstimatedFeeRate;
-    // coinControl.nFeeRate = specificFeeRate;
-    // 
-    // BOOST_FOREACH(const CTxIn& txin, tx.vin)
-    //     coinControl.Select(txin.prevout);
-    // 
-    // for (size_t i = 0; i < tx.vin.size(); i++) {
-    //     CTxIn txi = tx.vin[i];
-    //     CCoinsModifier coins = view.ModifyCoins(txi.prevout.hash);
-    //     CTxOut& prevout = coins->vout[txi.prevout.n];
-    //     
+    // auto dst = GetScriptForDestination(baTmp.Get());
+    // bool found = false;
+    // for (size_t i = 0; !found && i < tx.vout.size(); i++) {
+    //     if (tx.vout[i].scriptPubKey == dst) {
+    //         // got it
+    //         found = true;
+    //         tx.vout.erase(tx.vout.begin() + i);
+    //         if (tx.wit.vtxoutwit.size() > i) {
+    //             tx.wit.vtxoutwit.erase(tx.wit.vtxoutwit.begin() + i);
+    //         }
+    //     }
     // }
+    // if (!found) throw std::runtime_error("failed to find temporary output");
 
-    auto dst = GetScriptForDestination(baTmp.Get());
-    bool found = false;
-    for (size_t i = 0; !found && i < tx.vout.size(); i++) {
-        if (tx.vout[i].scriptPubKey == dst) {
-            // got it
-            found = true;
-            tx.vout.erase(tx.vout.begin() + i);
-            if (tx.wit.vtxoutwit.size() > i) {
-                tx.wit.vtxoutwit.erase(tx.wit.vtxoutwit.begin() + i);
-            }
-        }
-    }
-    if (!found) throw std::runtime_error("failed to find temporary output");
+    // // now find the outputs related to our bought asset; they will sum up to the amount we are putting in,
+    // // and we will end up removing all but one and setting it to the sum + the bought amount
+    // CAmount boughtInserted = 0;
+    // size_t primaryIdx = 0;
+    // size_t changeIdx = 0;
+    // for (size_t i = 0; i < tx.vout.size(); i++) {
+    //     CTxOut txo = tx.vout[i];
+    //     if (txo.nAsset.GetAsset() == buyCAsset) {
+    //         if (boughtInserted > 0) {
+    //             changeIdx = i;
+    //         } else {
+    //             primaryIdx = i;
+    //         }
+    //         boughtInserted += txo.nValue.GetAmount();
+    //     } else if (txo.nAsset.GetAsset() == BITCOINID) {
+    //         tx.vout.erase(tx.vout.begin() + i);
+    //         if (tx.wit.vtxoutwit.size() > i) {
+    //             tx.wit.vtxoutwit.erase(tx.wit.vtxoutwit.begin() + i);
+    //         }
+    //         i--;
+    //     }
+    // }
+    // // remove change, if any (we may have a perfect match)
+    // if (changeIdx != primaryIdx) {
+    //     tx.vout.erase(tx.vout.begin() + changeIdx);
+    //     if (tx.wit.vtxoutwit.size() > changeIdx) {
+    //         tx.wit.vtxoutwit.erase(tx.wit.vtxoutwit.begin() + changeIdx);
+    //     }
+    // }
+    // // modify primary amount
+    // tx.vout[primaryIdx].nValue = CConfidentialValue(boughtInserted + buyAmount);
+    // printf("tx: %s\n", CTransaction(tx).ToString().c_str());
 
-    // now find the outputs related to our bought asset; they will sum up to the amount we are putting in,
-    // and we will end up removing all but one and setting it to the sum + the bought amount
-    CAmount boughtInserted = 0;
-    size_t primaryIdx = 0;
-    size_t changeIdx = 0;
-    for (size_t i = 0; i < tx.vout.size(); i++) {
-        CTxOut txo = tx.vout[i];
-        if (txo.nAsset.GetAsset() == buyCAsset) {
-            if (boughtInserted > 0) {
-                changeIdx = i;
-            } else {
-                primaryIdx = i;
-            }
-            boughtInserted += txo.nValue.GetAmount();
-        }
-    }
-    // remove change, if any (we may have a perfect match)
-    if (changeIdx != primaryIdx) {
-        tx.vout.erase(tx.vout.begin() + changeIdx);
-        if (tx.wit.vtxoutwit.size() > changeIdx) {
-            tx.wit.vtxoutwit.erase(tx.wit.vtxoutwit.begin() + changeIdx);
-        }
-    }
-    // modify primary amount
-    tx.vout[primaryIdx].nValue = CConfidentialValue(boughtInserted + buyAmount);
-    printf("tx: %s\n", CTransaction(tx).ToString().c_str());
-
-    // wrap up into hex form again
-    UniValue preblindtx = EncodeHexTx(tx);
-
-    // before blinding, pull out commitments
+    // before blinding, pull out commitments; also kill maincoin uses here
     char predata[1024];
-    char* pdp = predata;
+    char* pdp = predata + 2; // put in amount after
     assert(tx.vin.size() < 256);
-    pdp += sprintf(pdp, "%02x", tx.vin.size());
     UniValue unspents = listunspent(JSONRPCRequest());
     std::map<uint256,std::map<int,UniValue>> unspentMap;
     for (size_t i = 0; i < unspents.size(); i++) {
@@ -3790,12 +3776,49 @@ UniValue makeoffer(const JSONRPCRequest& request)
         printf("storing=%s.%u\n", txid.ToString().c_str(), utxo["vout"].get_int());
         unspentMap[txid][utxo["vout"].get_int()] = utxo;
     }
+    std::map<std::string,CAmount> invals;
     for (size_t i = 0; i < tx.vin.size(); i++) {
         printf("fetching=%s.%u\n", tx.vin[i].prevout.hash.ToString().c_str(), tx.vin[i].prevout.n);
         UniValue txlist = unspentMap[tx.vin[i].prevout.hash][tx.vin[i].prevout.n];
         printf("got %s\n", txlist.write().c_str());
+        // if (txlist["asset"].get_str() == BITCOINID.GetHex()) {
+        //     printf("pulling -- no maincoin in offer\n");
+        //     tx.vin.erase(tx.vin.begin() + i);
+        //     if (tx.wit.vtxinwit.size() > i) {
+        //         tx.wit.vtxinwit.erase(tx.wit.vtxinwit.begin() + i);
+        //     }
+        //     i--;
+        //     continue;
+        // }
         pdp += sprintf(pdp, "%s", txlist["assetcommitment"].get_str().c_str());
+        invals[txlist["asset"].get_str()] += AmountFromValue(txlist["amount"]);
     }
+    char amnt[3];
+    sprintf(amnt, "%02x", tx.vin.size());
+    predata[0] = amnt[0];
+    predata[1] = amnt[1];
+    
+    std::map<std::string,CAmount> outvals;
+    for (size_t i = 0; i < tx.vout.size(); i++) {
+        CTxOut& to = tx.vout[i];
+        outvals[to.nAsset.GetAsset().GetHex()] += to.nValue.GetAmount();
+    }
+    printf("INPUTS:\n");
+    for (auto& kv : invals) {
+        printf("- %s: %lld\n", kv.first.c_str(), kv.second);
+    }
+    printf("OUTPUTS:\n");
+    for (auto& kv : outvals) {
+        invals[kv.first] -= kv.second;
+        printf("- %s: %lld\n", kv.first.c_str(), kv.second);
+    }
+    printf("REMAINING:\n");
+    for (auto& kv : invals) {
+        printf("- %s: %lld\n", kv.first.c_str(), kv.second);
+    }
+
+    // wrap up into hex form again
+    UniValue preblindtx = EncodeHexTx(tx);
 
     // and blind it
     r = JSONRPCRequest();
@@ -3814,7 +3837,7 @@ UniValue makeoffer(const JSONRPCRequest& request)
     // we are selecting everything so no need to define which ins/outs
     UniValue signedtx = signrawtransaction(r);
     std::string result = predata + signedtx["hex"].get_str();
-    return result;
+    return result; //signedtx["hex"];
 }
 
 UniValue matchoffer(const JSONRPCRequest& request)
@@ -3898,20 +3921,21 @@ UniValue matchoffer(const JSONRPCRequest& request)
     r.params.push_back(addrHash);
     r.params.push_back((int32_t)0);
     r.params.push_back(outputAssets);
-    printf("r = %s\n", r.params.write().c_str());
+    // printf("r = %s\n", r.params.write().c_str());
     UniValue rtx = createrawtransaction(r);
 
     // fund it
     r = JSONRPCRequest();
     r.params = UniValue(UniValue::VARR);
     r.params.push_back(rtx);
-    printf("r = %s\n", r.params.write().c_str());
+    // printf("r = %s\n", r.params.write().c_str());
     UniValue ftx = fundrawtransaction(r);
 
     CMutableTransaction tx;
     if (!DecodeHexTx(tx, ftx["hex"].get_str(), true)) {
         throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
     }
+    printf("funded: %s\n", CTransaction(tx).ToString().c_str());
 
     // before blinding, pull out commitments
     UniValue unspents = listunspent(JSONRPCRequest());
@@ -3928,6 +3952,8 @@ UniValue matchoffer(const JSONRPCRequest& request)
     // the selections for signing
     UniValue selectedInputs(UniValue::VARR);
     UniValue selectedOutputs(UniValue::VARR);
+    size_t startvin = intx.vin.size();
+    size_t startvout = intx.vout.size();
     for (size_t i = 0; i < tx.vin.size(); i++) {
         printf("fetching=%s.%u\n", tx.vin[i].prevout.hash.ToString().c_str(), tx.vin[i].prevout.n);
         UniValue txlist = unspentMap[tx.vin[i].prevout.hash][tx.vin[i].prevout.n];
@@ -3950,46 +3976,83 @@ UniValue matchoffer(const JSONRPCRequest& request)
 
     // now find and remove addrTmp output
 
-    auto dst = GetScriptForDestination(baTmp.Get());
-    bool found = false;
-    for (size_t i = 0; !found && i < tx.vout.size(); i++) {
-        if (tx.vout[i].scriptPubKey == dst) {
-            // got it
-            found = true;
-            tx.vout.erase(tx.vout.begin() + i);
-            if (tx.wit.vtxoutwit.size() > i) {
-                tx.wit.vtxoutwit.erase(tx.wit.vtxoutwit.begin() + i);
-            }
-        }
-    }
-    if (!found) throw std::runtime_error("failed to find temporary output");
+    // auto dst = GetScriptForDestination(baTmp.Get());
+    // bool found = false;
+    // for (size_t i = startvout; !found && i < tx.vout.size(); i++) {
+    //     if (tx.vout[i].scriptPubKey == dst) {
+    //         // got it
+    //         found = true;
+    //         tx.vout.erase(tx.vout.begin() + i);
+    //         if (tx.wit.vtxoutwit.size() > i) {
+    //             tx.wit.vtxoutwit.erase(tx.wit.vtxoutwit.begin() + i);
+    //         }
+    //     }
+    // }
+    // if (!found) throw std::runtime_error("failed to find temporary output");
 
     // now find the outputs related to our bought asset; they will sum up to the amount we are putting in,
     // and we will end up removing all but one and setting it to the sum + the bought amount
-    CAmount boughtInserted = 0;
-    size_t primaryIdx = 0;
-    size_t changeIdx = 0;
+    // CAmount boughtInserted = 0;
+    // size_t primaryIdx = 0;
+    // size_t changeIdx = 0;
+    // printf("finding bought (%s)\n", buyAsset.c_str());
+    // for (size_t i = startvout; i < tx.vout.size(); i++) {
+    //     CTxOut txo = tx.vout[i];
+    //     if (txo.nAsset.IsExplicit() && txo.nAsset.GetAsset() == buyCAsset) {
+    //         printf("vout %lu: %lld", i, txo.nValue.GetAmount());
+    //         if (boughtInserted > 0) {
+    //             changeIdx = i;
+    //             printf(" [change]");
+    //         } else {
+    //             primaryIdx = i;
+    //             printf(" [primary]");
+    //         }
+    //         boughtInserted += txo.nValue.GetAmount();
+    //         printf("\n");
+    //     }
+    // } 
+    // // remove change, if any (we may have a perfect match)
+    // if (changeIdx != primaryIdx) {
+    //     printf("removing change vout %lu\n", changeIdx);
+    //     tx.vout.erase(tx.vout.begin() + changeIdx);
+    //     if (tx.wit.vtxoutwit.size() > changeIdx) {
+    //         tx.wit.vtxoutwit.erase(tx.wit.vtxoutwit.begin() + changeIdx);
+    //     }
+    // }
+    // // modify primary amount
+    // printf("modifying primary amount to %lld\n", boughtInserted + buyAmount);
+    // tx.vout[primaryIdx].nValue = CConfidentialValue(boughtInserted + buyAmount);
+    // printf("tx: %s\n", CTransaction(tx).ToString().c_str());
+
+    std::map<std::string,CAmount> invals;
+    for (size_t i = 0; i < intx.vin.size(); i++) {
+        printf("fetching=%s.%u\n", intx.vin[i].prevout.hash.ToString().c_str(), intx.vin[i].prevout.n);
+        UniValue txlist = unspentMap[intx.vin[i].prevout.hash][intx.vin[i].prevout.n];
+        if (!txlist.isNull()) {
+            printf("+ %s %lld\n", txlist["asset"].get_str().c_str(), AmountFromValue(txlist["amount"]));
+            invals[txlist["asset"].get_str()] += AmountFromValue(txlist["amount"]);
+        }
+    }
+    std::map<std::string,CAmount> outvals;
     for (size_t i = 0; i < tx.vout.size(); i++) {
-        CTxOut txo = tx.vout[i];
-        if (txo.nAsset.IsExplicit() && txo.nAsset.GetAsset() == buyCAsset) {
-            if (boughtInserted > 0) {
-                changeIdx = i;
-            } else {
-                primaryIdx = i;
-            }
-            boughtInserted += txo.nValue.GetAmount();
+        CTxOut& to = tx.vout[i];
+        if (to.nAsset.IsExplicit()) {
+            outvals[to.nAsset.GetAsset().GetHex()] += to.nValue.GetAmount();
         }
     }
-    // remove change, if any (we may have a perfect match)
-    if (changeIdx != primaryIdx) {
-        tx.vout.erase(tx.vout.begin() + changeIdx);
-        if (tx.wit.vtxoutwit.size() > changeIdx) {
-            tx.wit.vtxoutwit.erase(tx.wit.vtxoutwit.begin() + changeIdx);
-        }
+    printf("INPUTS:\n");
+    for (auto& kv : invals) {
+        printf("- %s: %lld\n", kv.first.c_str(), kv.second);
     }
-    // modify primary amount
-    tx.vout[primaryIdx].nValue = CConfidentialValue(boughtInserted + buyAmount);
-    printf("tx: %s\n", CTransaction(tx).ToString().c_str());
+    printf("OUTPUTS:\n");
+    for (auto& kv : outvals) {
+        invals[kv.first] -= kv.second;
+        printf("- %s: %lld\n", kv.first.c_str(), kv.second);
+    }
+    printf("REMAINING:\n");
+    for (auto& kv : invals) {
+        printf("- %s: %lld\n", kv.first.c_str(), kv.second);
+    }
 
     // wrap up into hex form again
     UniValue preblindtx = EncodeHexTx(tx);
