@@ -2509,32 +2509,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     uint256 hashPrevBlock = pindex->pprev == NULL ? uint256() : pindex->pprev->GetBlockHash();
     assert(hashPrevBlock == view.GetBestBlock());
 
-    // Gesesis coinbase *is* spendable
+    // Gesesis coinbase has no spendable outputs.
     if (block.GetHash() == chainparams.GetConsensus().hashGenesisBlock) {
         if (!fJustCheck) {
-            assert(block.vtx.size() == 1);
-            assert(block.nHeight == 0);
-
-            std::vector<std::pair<uint256, CDiskTxPos> > vPos;
-            std::multimap<uint256, std::pair<COutPoint, CAmount> > mLocksCreated;
-            const CTransaction tx = *(block.vtx[0]);
-
-            CTxUndo undoDummy;
-            UpdateCoins(tx, view, undoDummy, pindex->nHeight);
-
-            CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
-            vPos.push_back(std::make_pair(tx.GetHash(), pos));
-            for (unsigned int i = 0; i < tx.vout.size(); i++) {
-                CTxOut txout= tx.vout[i];
-                if (txout.scriptPubKey.IsWithdrawLock() && txout.nValue.IsExplicit() && txout.nAsset.IsExplicit() && txout.nAsset.GetAsset() == Params().GetConsensus().pegged_asset)
-                    mLocksCreated.insert(std::make_pair(txout.scriptPubKey.GetWithdrawLockGenesisHash(), std::make_pair(COutPoint(tx.GetHash(), i), txout.nValue.GetAmount())));
-            }
-
-            if (fTxIndex)
-                if (!pblocktree->WriteTxIndex(vPos))
-                    return AbortNode(state, "Failed to write transaction index");
-            pblocktree->WriteLocksCreated(mLocksCreated);
-
             view.SetBestBlock(pindex->GetBlockHash());
         }
         return true;
