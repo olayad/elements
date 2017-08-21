@@ -51,7 +51,7 @@ static CBlock CreateGenesisBlock(const Consensus::Params& params, const std::str
     // Any consensus-related values that are command-line set can be added here for anti-footgun
     txNew.vin[0].scriptSig = CScript(CommitToArguments(params, networkID, scriptChallenge));
     txNew.vout.clear();
-    txNew.vout.push_back(CTxOut(uint256(), 0, CScript() << OP_RETURN));
+    txNew.vout.push_back(CTxOut(CAsset(), 0, CScript() << OP_RETURN));
 
     CBlock genesis;
     genesis.nTime    = nTime;
@@ -145,7 +145,7 @@ public:
         CalculateAsset(consensus.pegged_asset, entropy);
 
         CScript scriptDestination(CScript() << std::vector<unsigned char>(parentGenesisBlockHash.begin(), parentGenesisBlockHash.end()) << OP_WITHDRAWPROOFVERIFY);
-        genesis = CreateGenesisBlock(consensus, strNetworkID, scriptDestination, 1231006505, genesisChallengeScript, 1, MAX_MONEY, 100, consensus.pegged_asset);
+        genesis = CreateGenesisBlock(consensus, strNetworkID, 1231006505, genesisChallengeScript, 1);
         consensus.hashGenesisBlock = genesis.GetHash();
 
         scriptCoinbaseDestination = CScript() << ParseHex("0229536c4c83789f59c30b93eb40d4abbd99b8dcc99ba8bd748f29e33c1d279e3c") << OP_CHECKSIG;
@@ -255,6 +255,7 @@ public:
         CalculateAsset(consensus.pegged_asset, entropy);
 
         genesis = CreateGenesisBlock(consensus, strNetworkID, defaultRegtestScript, 1296688602, genesisChallengeScript, 1, MAX_MONEY, 100, consensus.pegged_asset);
+        genesis = CreateGenesisBlock(consensus, strNetworkID, 1296688602, genesisChallengeScript, 1);
         consensus.hashGenesisBlock = genesis.GetHash();
 
 
