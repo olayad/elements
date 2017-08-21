@@ -3699,6 +3699,7 @@ UniValue claimpegin(const JSONRPCRequest& request)
     if (value > MAX_MONEY / 200)
         throw JSONRPCError(RPC_VERIFY_REJECTED, "IsStandard rules prevent pegging-in > 0.105 million BTC reliably at a time - please work with your functionary to mine a large lock-merge transaction first");
 
+    /*
     //Pad the locked outputs by the IsStandard lock dust value
     CTxOut dummyTxOut(Params().GetConsensus().pegged_asset, 0, relock_spk);
     CAmount lockDust(dummyTxOut.GetDustThreshold(withdrawLockTxFee));
@@ -3770,6 +3771,8 @@ UniValue claimpegin(const JSONRPCRequest& request)
 	AuditLogPrintf("%s : claimpegin %s\n", getUser(), finalTxn.ToString());
 
     return finalTxn.GetHash().GetHex();
+    */
+    return NullUniValue;
 }
 
 UniValue issueasset(const JSONRPCRequest& request)
