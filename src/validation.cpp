@@ -2631,7 +2631,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
     std::vector<std::pair<uint256, CDiskTxPos> > vPos;
     vPos.reserve(block.vtx.size());
-    std::multimap<uint256, std::pair<COutPoint, CAmount> > mLocksCreated;
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
     std::vector<PrecomputedTransactionData> txdata;
     txdata.reserve(block.vtx.size()); // Required so that pointers to individual PrecomputedTransactionData don't get invalidated
@@ -2693,12 +2692,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         vPos.push_back(std::make_pair(tx.GetHash(), pos));
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
 
-        for (unsigned int j = 0; j < tx.vout.size(); j++) {
-            CTxOut txout = tx.vout[j];
-            if (txout.scriptPubKey.IsWithdrawLock() && txout.nValue.IsExplicit() && txout.nAsset.IsExplicit() && txout.nAsset.GetAsset() == Params().GetConsensus().pegged_asset) {
-                mLocksCreated.insert(std::make_pair(txout.scriptPubKey.GetWithdrawLockGenesisHash(), std::make_pair(COutPoint(tx.GetHash(), j), txout.nValue.GetAmount())));
-            }
-        }
         if (!tx.HasValidFee())
             return state.DoS(100, error("ConnectBlock(): transaction fee overflowed"), REJECT_INVALID, "bad-fee-outofrange");
         mapFees += tx.GetFee();
@@ -2748,8 +2741,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if (fTxIndex)
         if (!pblocktree->WriteTxIndex(vPos))
             return AbortNode(state, "Failed to write transaction index");
-
-    pblocktree->WriteLocksCreated(mLocksCreated);
 
     // add this block to the view's block chain
     view.SetBestBlock(pindex->GetBlockHash());
