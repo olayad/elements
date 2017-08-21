@@ -1659,22 +1659,12 @@ uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo, unsig
     return ss.GetHash();
 }
 
-CTxOut BaseSignatureChecker::GetOutputOffsetFromCurrent(const int offset) const
-{
-    return CTxOut();
-}
-
-COutPoint BaseSignatureChecker::GetPrevOut() const
-{
-    return COutPoint();
-}
-
-bool TransactionNoWithdrawsSignatureChecker::VerifySignature(const std::vector<unsigned char>& vchSig, const CPubKey& pubkey, const uint256& sighash) const
+bool TransactionSignatureChecker::VerifySignature(const std::vector<unsigned char>& vchSig, const CPubKey& pubkey, const uint256& sighash) const
 {
     return pubkey.Verify(sighash, vchSig);
 }
 
-bool TransactionNoWithdrawsSignatureChecker::CheckSig(const vector<unsigned char>& vchSigIn, const vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion) const
+bool TransactionSignatureChecker::CheckSig(const vector<unsigned char>& vchSigIn, const vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion) const
 {
     CPubKey pubkey(vchPubKey);
     if (!pubkey.IsValid())
@@ -1695,7 +1685,7 @@ bool TransactionNoWithdrawsSignatureChecker::CheckSig(const vector<unsigned char
     return true;
 }
 
-bool TransactionNoWithdrawsSignatureChecker::CheckLockTime(const CScriptNum& nLockTime) const
+bool TransactionSignatureChecker::CheckLockTime(const CScriptNum& nLockTime) const
 {
     // There are two kinds of nLockTime: lock-by-blockheight
     // and lock-by-blocktime, distinguished by whether
@@ -1731,7 +1721,7 @@ bool TransactionNoWithdrawsSignatureChecker::CheckLockTime(const CScriptNum& nLo
     return true;
 }
 
-bool TransactionNoWithdrawsSignatureChecker::CheckSequence(const CScriptNum& nSequence) const
+bool TransactionSignatureChecker::CheckSequence(const CScriptNum& nSequence) const
 {
     // Relative lock times are supported by comparing the passed
     // in operand to the sequence number of the input.
@@ -1775,38 +1765,6 @@ bool TransactionNoWithdrawsSignatureChecker::CheckSequence(const CScriptNum& nSe
         return false;
 
     return true;
-}
-
-CTxOut TransactionSignatureChecker::GetOutputOffsetFromCurrent(const int offset) const
-{
-    assert(int(nIn) >= 0 && int(txTo->vout.size()) > 0);
-    if (int(nIn) + offset < 0 || int(txTo->vout.size()) <= int(nIn) + offset)
-        return CTxOut();
-    return txTo->vout[int(nIn) + offset];
-}
-
-COutPoint TransactionSignatureChecker::GetPrevOut() const
-{
-    return txTo->vin[nIn].prevout;
-}
-
-CConfidentialValue TransactionSignatureChecker::GetValueIn() const
-{
-    return amount;
-}
-
-CConfidentialValue TransactionSignatureChecker::GetValueInPrevIn() const
-{
-    return amountPreviousInput;
-}
-
-bool TransactionSignatureChecker::IsConfirmedBitcoinBlock(const uint256& hash, bool fConservativeConfirmationRequirements, uint32_t nConfirmationsRequired) const
-{
-#ifndef BITCOIN_SCRIPT_NO_CALLRPC
-    return ::IsConfirmedBitcoinBlock(hash, nConfirmationsRequired + (fConservativeConfirmationRequirements ? 2 : 0));
-#else
-    return true;
-#endif
 }
 
 static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, const std::vector<unsigned char>& program, unsigned int flags, const BaseSignatureChecker& checker, ScriptError* serror)
