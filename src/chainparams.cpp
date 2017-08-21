@@ -43,21 +43,15 @@ static CScript StrHexToScriptWithDefault(std::string strScript, const CScript de
     return returnScript;
 }
 
-static CBlock CreateGenesisBlock(const Consensus::Params& params, const std::string& networkID, const CScript& genesisOutputScript, uint32_t nTime, const CScript& scriptChallenge, int32_t nVersion, const CAmount& genesisReward, const uint32_t rewardShards, const CAsset& asset)
+static CBlock CreateGenesisBlock(const Consensus::Params& params, const std::string& networkID, uint32_t nTime, const CScript& scriptChallenge, int32_t nVersion)
 {
-    // Shards must be evenly divisible
-    assert(MAX_MONEY % rewardShards == 0);
     CMutableTransaction txNew;
     txNew.nVersion = 1;
     txNew.vin.resize(1);
-    txNew.vout.resize(rewardShards);
     // Any consensus-related values that are command-line set can be added here for anti-footgun
     txNew.vin[0].scriptSig = CScript(CommitToArguments(params, networkID, scriptChallenge));
-    for (unsigned int i = 0; i < rewardShards; i++) {
-        txNew.vout[i].nValue = genesisReward/rewardShards;
-        txNew.vout[i].nAsset = asset;
-        txNew.vout[i].scriptPubKey = genesisOutputScript;
-    }
+    txNew.vout.clear();
+    txNew.vout.push_back(CTxOut(uint256(), 0, CScript() << OP_RETURN));
 
     CBlock genesis;
     genesis.nTime    = nTime;
