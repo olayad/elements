@@ -707,6 +707,28 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
     for (size_t i = 0; i < tx.vin.size(); ++i)
     {
 
+        // Process peg-in inputs by contructing a pseudo-CTxOut
+        CTxOut pseudoOut;
+        if (tx.vin[i].prevout == uint256S("1")) {
+            // InWitness must have a single witness stack item of the correct format
+            // and have no issuances or associated witnesses
+            if (tx.wit.vtxinwit.size() <= i || !tx.vin[i].assetIssuance.IsNull()) {
+                return false;
+            }
+            CTxInWitness& txinwit = tx.wit.vtxinwit[i];
+            if (txinwit.scriptWitness.size() != 1 || !txinwit.vchIssuanceAmountRangeproof.IsNull()
+                    || !txinwit.vchInflationKeysRangeproof.IsNull()) {
+                return false;
+            }
+            CScript pegWitness(tx.wit.vtxinwit[i].scriptWitness.back().begin(), tx.wit.vtxinwit[i].scriptWitness.back().end());
+            if (!pegWitness.IsPeginWitness()) {
+                return false;
+            }
+            if (!GetBoolArg("-validatepegin", DEFAULT_VALIDATE_PEGIN)) {
+                return true;
+            }
+        }
+
         const CTxOut out = cache.GetOutputFor(tx.vin[i]);
         const CConfidentialValue& val = out.nValue;
         const CConfidentialAsset& asset = out.nAsset;

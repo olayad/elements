@@ -215,7 +215,7 @@ unsigned int CScript::GetSigOpCount(const CScript& scriptSig) const
     return subscript.GetSigOpCount(true);
 }
 
-bool CScript::IsWithdrawProof() const
+bool CScript::IsPeginWitness() const
 {
     // Format is <contract> <merkleBlock>xN <N> <locking tx>xM <M> <output index>
     // for at least 6 total pushes
