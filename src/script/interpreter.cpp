@@ -23,10 +23,6 @@
 #include "utilstrencodings.h"
 #include "util.h"
 
-#ifndef BITCOIN_SCRIPT_NO_CALLRPC
-#include "callrpc.h"
-#endif
-
 using namespace std;
 
 typedef vector<unsigned char> valtype;
