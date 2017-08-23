@@ -56,10 +56,6 @@
 # error "Bitcoin cannot be compiled without assertions."
 #endif
 
-#ifndef BITCOIN_SCRIPT_NO_CALLRPC
-#include "callrpc.h"
-#endif
-
 /**
  * Global state
  */
