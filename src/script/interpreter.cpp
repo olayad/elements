@@ -268,6 +268,7 @@ bool static CheckMinimalPush(const valtype& data, opcodetype opcode) {
     return true;
 }
 
+// TODO Remove? We shouldn't need this at all.
 bool static WithdrawProofReadStackItem(const vector<valtype>& stack, const bool fRequireMinimal, int *stackOffset, valtype& read)
 {
     if (stack.size() < size_t(-(*stackOffset)))

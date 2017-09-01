@@ -709,7 +709,7 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
 
         // Process peg-in inputs by contructing a pseudo-CTxOut
         CTxOut pseudoOut;
-        if (tx.vin[i].prevout == uint256S("1")) {
+/*        if (tx.vin[i].prevout == uint256S("1")) {
             // InWitness must have a single witness stack item of the correct format
             // and have no issuances or associated witnesses
             if (tx.wit.vtxinwit.size() <= i || !tx.vin[i].assetIssuance.IsNull()) {
@@ -727,9 +727,9 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
             if (!GetBoolArg("-validatepegin", DEFAULT_VALIDATE_PEGIN)) {
                 return true;
             }
-        }
+        }*/
 
-        const CTxOut out = cache.GetOutputFor(tx.vin[i]);
+        const CTxOut out = tx.vin[i].m_is_pegin ? pseudoOut : cache.GetOutputFor(tx.vin[i]);
         const CConfidentialValue& val = out.nValue;
         const CConfidentialAsset& asset = out.nAsset;
 
@@ -1185,8 +1185,8 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState& state, const C
         if (!view.HaveInputs(tx))
             return state.Invalid(false, REJECT_DUPLICATE, "bad-txns-inputs-spent");
 
-        for (const auto& txin, tx.vin) {
-            if (txin.prevout.hash == uint) {
+        for (const auto& txin : tx.vin) {
+            if (txin.m_is_pegin) {
                 std::pair<uint256, COutPoint> outpoint;
                 //TODO Extract genesis hash from witness, create entry
                 if (view.IsWithdrawSpent(outpoint))
@@ -1831,25 +1831,26 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo &txund
         txundo.vprevout.reserve(tx.vin.size());
         for (unsigned int i = 0; i < tx.vin.size(); i++) {
             const CTxIn &txin = tx.vin[i];
-            CCoinsModifier coins = inputs.ModifyCoins(txin.prevout.hash);
-            unsigned nPos = txin.prevout.n;
+            if (txin.m_is_pegin) {
+                    std::pair<uint256, COutPoint> outpoint;
+                    inputs.SetWithdrawSpent(outpoint, true);
 
-            if (nPos >= coins->vout.size() || coins->vout[nPos].IsNull())
-                assert(false);
+            } else {
+                CCoinsModifier coins = inputs.ModifyCoins(txin.prevout.hash);
+                unsigned nPos = txin.prevout.n;
 
-            if (coins->vout[txin.prevout.n].scriptPubKey.IsWithdrawLock() && txin.scriptSig.IsWithdrawProof()) {
-                std::pair<uint256, COutPoint> outpoint = std::make_pair(coins->vout[txin.prevout.n].scriptPubKey.GetWithdrawLockGenesisHash(), txin.scriptSig.GetWithdrawSpent());
-                inputs.SetWithdrawSpent(outpoint, true);
-            }
+                if (nPos >= coins->vout.size() || coins->vout[nPos].IsNull())
+                    assert(false);
 
-            // mark an outpoint spent, and construct undo information
-            txundo.vprevout.push_back(CTxInUndo(coins->vout[nPos]));
-            coins->Spend(nPos);
-            if (coins->vout.size() == 0) {
-                CTxInUndo& undo = txundo.vprevout.back();
-                undo.nHeight = coins->nHeight;
-                undo.fCoinBase = coins->fCoinBase;
-                undo.nVersion = coins->nVersion;
+                // mark an outpoint spent, and construct undo information
+                txundo.vprevout.push_back(CTxInUndo(coins->vout[nPos]));
+                coins->Spend(nPos);
+                if (coins->vout.size() == 0) {
+                    CTxInUndo& undo = txundo.vprevout.back();
+                    undo.nHeight = coins->nHeight;
+                    undo.fCoinBase = coins->fCoinBase;
+                    undo.nVersion = coins->nVersion;
+                }
             }
         }
     }
@@ -1891,35 +1892,29 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
         for (unsigned int i = 0; i < tx.vin.size(); i++)
         {
             const COutPoint &prevout = tx.vin[i].prevout;
-            const CCoins *coins = inputs.AccessCoins(prevout.hash);
-            assert(coins);
-
-            // If prev is coinbase, check that it's matured
-            if (coins->IsCoinBase()) {
-                if (nSpendHeight - coins->nHeight < COINBASE_MATURITY)
-                    return state.Invalid(false,
-                        REJECT_INVALID, "bad-txns-premature-spend-of-coinbase",
-                        strprintf("tried to spend coinbase at depth %d", nSpendHeight - coins->nHeight));
-            }
-
-            // Check for negative or overflow input values
-            const CConfidentialValue& value = coins->vout[prevout.n].nValue;
-            if (value.IsExplicit()) {
-                nValueIn += value.GetAmount();
-                if (!MoneyRange(value.GetAmount()) || !MoneyRange(nValueIn))
-                    return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputvalues-outofrange");
-            }
-
-            if (coins->vout[prevout.n].scriptPubKey.IsWithdrawLock() && tx.vin[i].scriptSig.IsWithdrawProof()) {
-                uint256 genesisHash(coins->vout[prevout.n].scriptPubKey.GetWithdrawLockGenesisHash());
-                COutPoint withdrawSpent(tx.vin[i].scriptSig.GetWithdrawSpent());
-                std::pair<uint256, COutPoint> withdraw = std::make_pair(genesisHash, withdrawSpent);
-                if (inputs.IsWithdrawSpent(withdraw))
-                    return state.Invalid(false, REJECT_INVALID, "bad-txns-double-withdraw", strprintf("Double-withdraw of %s:%d", withdrawSpent.hash.ToString(), withdrawSpent.n));
-                if (setWithdrawsSpent.count(withdraw))
-                    return state.DoS(100, false, REJECT_INVALID, "bad-txns-double-withdraw-in-obj", false,
-                            strprintf("Double-withdraw of %s:%d in single tx/block", withdrawSpent.hash.ToString(), withdrawSpent.n));
+            if (tx.vin[i].m_is_pegin) {
+                // TODO Peg-in input validation logic
+                std::pair<uint256, COutPoint> withdraw;
                 setWithdrawsSpent.insert(withdraw);
+            } else {
+                const CCoins *coins = inputs.AccessCoins(prevout.hash);
+                assert(coins);
+
+                // If prev is coinbase, check that it's matured
+                if (coins->IsCoinBase()) {
+                    if (nSpendHeight - coins->nHeight < COINBASE_MATURITY)
+                        return state.Invalid(false,
+                            REJECT_INVALID, "bad-txns-premature-spend-of-coinbase",
+                            strprintf("tried to spend coinbase at depth %d", nSpendHeight - coins->nHeight));
+                }
+
+                // Check for negative or overflow input values
+                const CConfidentialValue& value = coins->vout[prevout.n].nValue;
+                if (value.IsExplicit()) {
+                    nValueIn += value.GetAmount();
+                    if (!MoneyRange(value.GetAmount()) || !MoneyRange(nValueIn))
+                        return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputvalues-outofrange");
+                }
             }
         }
 
@@ -2173,6 +2168,7 @@ bool DisconnectBlock(const CBlock& block, CValidationState& state, const CBlockI
             for (unsigned int j = tx.vin.size(); j-- > 0;) {
                 const COutPoint &out = tx.vin[j].prevout;
                 const CTxInUndo &undo = txundo.vprevout[j];
+                // TODO make sure we handle pegin rewinds correctly
                 if (!ApplyTxInUndo(undo, view, out, tx.vin[j]))
                     fClean = false;
             }
