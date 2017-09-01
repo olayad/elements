@@ -120,16 +120,11 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs)
 
     for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
-        const CTxOut& prev = mapInputs.GetOutputFor(tx.vin[i]);
-
-        if (prev.scriptPubKey.IsWithdrawLock()) {
-            if (!tx.vin[i].scriptSig.IsWithdrawProof()) {
-                if (tx.vout.size() < i)
-                    if (!tx.vout[i].nValue.IsExplicit() || tx.vout[i].nValue.GetAmount() > MAX_MONEY / 100)
-                        return false;
-            }
+        if (tx.vin[i].m_is_pegin) {
+            // TODO Peg-in check
             continue;
         }
+        const CTxOut& prev = mapInputs.GetOutputFor(tx.vin[i]);
 
         // Biggest 'standard' txin is a 15-of-15 P2SH multisig with compressed
         // keys. (remember the 520 byte limit on redeemScript size) That works
