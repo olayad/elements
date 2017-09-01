@@ -1834,6 +1834,8 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo &txund
             if (txin.m_is_pegin) {
                     std::pair<uint256, COutPoint> outpoint;
                     inputs.SetWithdrawSpent(outpoint, true);
+                    // Dummy undo
+                    txundo.vprevout.push_back(CTxInUndo());
 
             } else {
                 CCoinsModifier coins = inputs.ModifyCoins(txin.prevout.hash);
@@ -2079,38 +2081,40 @@ bool ApplyTxInUndo(const CTxInUndo& undo, CCoinsViewCache& view, const COutPoint
 {
     bool fClean = true;
 
-    CCoinsModifier coins = view.ModifyCoins(out.hash);
-    if (undo.nHeight != 0 ||
-            // Special-case genesis since nHeight is always 0, assume DB is clean
-            (Params().GenesisBlock().vtx[0]->GetHash() == out.hash && coins->IsPruned())) {
-        // undo data contains height: this is the last output of the prevout tx being spent
-        if (!coins->IsPruned())
-            fClean = fClean && error("%s: undo data overwriting existing transaction", __func__);
-        coins->Clear();
-        coins->fCoinBase = undo.fCoinBase;
-        coins->nHeight = undo.nHeight;
-        coins->nVersion = undo.nVersion;
-    } else {
-        if (coins->IsPruned())
-            fClean = fClean && error("%s: undo data adding output to missing transaction", __func__);
-    }
-    if (coins->IsAvailable(out.n))
-        fClean = fClean && error("%s: undo data overwriting existing output", __func__);
-    if (coins->vout.size() < out.n+1)
-        coins->vout.resize(out.n+1);
-    coins->vout[out.n] = undo.txout;
-
-    if (undo.txout.scriptPubKey.IsWithdrawLock()) {
-        if (!txin.scriptSig.IsWithdrawProof()) {
-            if (!txin.scriptSig.IsPushOnly())
-                fClean = fClean && error("%s: lock spent by non-proof", __func__);
+    if (!txin.m_is_pegin) {
+        CCoinsModifier coins = view.ModifyCoins(out.hash);
+        if (undo.nHeight != 0 ||
+                // Special-case genesis since nHeight is always 0, assume DB is clean
+                (Params().GenesisBlock().vtx[0]->GetHash() == out.hash && coins->IsPruned())) {
+            // undo data contains height: this is the last output of the prevout tx being spent
+            if (!coins->IsPruned())
+                fClean = fClean && error("%s: undo data overwriting existing transaction", __func__);
+            coins->Clear();
+            coins->fCoinBase = undo.fCoinBase;
+            coins->nHeight = undo.nHeight;
+            coins->nVersion = undo.nVersion;
         } else {
-            std::pair<uint256, COutPoint> outpoint = std::make_pair(undo.txout.scriptPubKey.GetWithdrawLockGenesisHash(), txin.scriptSig.GetWithdrawSpent());
+            if (coins->IsPruned())
+                fClean = fClean && error("%s: undo data adding output to missing transaction", __func__);
+        }
+        if (coins->IsAvailable(out.n))
+            fClean = fClean && error("%s: undo data overwriting existing output", __func__);
+        if (coins->vout.size() < out.n+1)
+            coins->vout.resize(out.n+1);
+        coins->vout[out.n] = undo.txout;
+    } else {
+        // TODO make this about witness data, validate logic
+        if (!txin.scriptSig.IsWithdrawProof()) {
+            // This seems wrong: if (!txin.scriptSig.IsPushOnly())
+            fClean = fClean && error("%s: lock spent by non-proof", __func__);
+        } else {
+            std::pair<uint256, COutPoint> outpoint;
             bool fSpent = view.IsWithdrawSpent(outpoint);
-            if (!fSpent)
+            if (!fSpent) {
                 fClean = fClean && error("%s: withdraw not marked spent", __func__);
-            else
+            } else {
                 view.SetWithdrawSpent(outpoint, false);
+            }
         }
     }
 
