@@ -1185,15 +1185,10 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState& state, const C
         if (!view.HaveInputs(tx))
             return state.Invalid(false, REJECT_DUPLICATE, "bad-txns-inputs-spent");
 
-        BOOST_FOREACH(const CTxIn &txin, tx.vin)
-        {
-            CCoins coins;
-            bool ret;
-            ret = view.GetCoins(txin.prevout.hash, coins);
-            assert(ret);
-            if (coins.vout[txin.prevout.n].scriptPubKey.IsWithdrawLock() && txin.scriptSig.IsWithdrawProof()) {
-                std::pair<uint256, COutPoint> outpoint = std::make_pair(coins.vout[txin.prevout.n].scriptPubKey.GetWithdrawLockGenesisHash(), txin.scriptSig.GetWithdrawSpent());
-
+        for (const auto& txin, tx.vin) {
+            if (txin.prevout.hash == uint) {
+                std::pair<uint256, COutPoint> outpoint;
+                //TODO Extract genesis hash from witness, create entry
                 if (view.IsWithdrawSpent(outpoint))
                     return state.Invalid(false, REJECT_CONFLICT, "withdraw-already-claimed");
                 setWithdrawsSpent.insert(outpoint);
