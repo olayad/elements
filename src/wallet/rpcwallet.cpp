@@ -3701,7 +3701,7 @@ UniValue claimpegin(const JSONRPCRequest& request)
 
     //Pad the locked outputs by the IsStandard lock dust value
     CTxOut dummyTxOut(Params().GetConsensus().pegged_asset, 0, relock_spk);
-    CAmount lockDust(dummyTxOut.GetDustThreshold(withdrawLockTxFee));
+    CAmount lockDust(0);//dummyTxOut.GetDustThreshold(withdrawLockTxFee));
 
     LOCK(cs_main);
 
