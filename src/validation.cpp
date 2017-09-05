@@ -1185,7 +1185,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState& state, const C
         if (!view.HaveInputs(tx))
             return state.Invalid(false, REJECT_DUPLICATE, "bad-txns-inputs-spent");
 
-        // Extract peg-in inputs, pass set to mempool entry
+        // Extract peg-in inputs, pass set to mempool entry. Validity of pegins checked in CheckInputs
         for (const auto& txin : tx.vin) {
             if (txin.m_is_pegin) {
                 std::pair<uint256, COutPoint> outpoint;
@@ -1892,7 +1892,7 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
         {
             const COutPoint &prevout = tx.vin[i].prevout;
             if (tx.vin[i].m_is_pegin) {
-                // TODO Peg-in input validation logic
+                // TODO-PEGIN Peg-in input validation logic
                 std::pair<uint256, COutPoint> withdraw;
                 setWithdrawsSpent.insert(withdraw);
             } else {
