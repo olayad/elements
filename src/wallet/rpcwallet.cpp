@@ -3388,6 +3388,7 @@ public:
 static CSecp256k1Init instance_of_csecp256k1;
 }
 
+// TODO-PEGIN re-write for new pegin method
 CScriptID calculate_contract(const CScript& federationRedeemScript, const CBitcoinAddress& destAddress, const unsigned char nonce[16], unsigned char fullcontract[40]) {
     fullcontract[0] = (unsigned char)'P';
     fullcontract[1] = (unsigned char)'2';
