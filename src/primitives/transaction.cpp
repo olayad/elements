@@ -96,6 +96,7 @@ std::string CTxIn::ToString() const
 CMutableTransaction::CMutableTransaction() : nVersion(CTransaction::CURRENT_VERSION), vin(), vout(), wit(), nLockTime(0) {}
 CMutableTransaction::CMutableTransaction(const CTransaction& tx) : nVersion(tx.nVersion), vin(tx.vin), vout(tx.vout), wit(tx.wit), nLockTime(tx.nLockTime) {}
 
+// TODO-PEGIN discuss with mark
 /**
  * The input witness consists of three elements, two of which are
  * optional. The optional elements have to do with asset issuance
@@ -120,6 +121,7 @@ uint256 CTxInWitness::GetHash() const
     leaves.push_back(SerializeHash(vchIssuanceAmountRangeproof, SER_GETHASH, 0));
     leaves.push_back(SerializeHash(vchInflationKeysRangeproof, SER_GETHASH, 0));
     leaves.push_back(SerializeHash(scriptWitness.stack, SER_GETHASH, 0));
+    leaves.push_back(SerializeHash(peginWitness.stack, SER_GETHASH, 0));
     return ComputeFastMerkleRoot(leaves);
 }
 
