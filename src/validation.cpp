@@ -1865,7 +1865,6 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, int nHeight)
 
 bool CScriptCheck::operator()() {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
-    // TODO-PEGIN Peg-in authorization in witness is stripped, then only spend authorization is validated as normal input
     const CScriptWitness *witness = (nIn < ptxTo->wit.vtxinwit.size()) ? &ptxTo->wit.vtxinwit[nIn].scriptWitness : NULL;
     if (!VerifyScript(scriptSig, scriptPubKey, witness, nFlags, CachingTransactionSignatureChecker(ptxTo, nIn, amount, cacheStore, *txdata), &error)) {
         return false;
@@ -1896,6 +1895,7 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
                 // TODO-PEGIN Peg-in input validation logic
                 // make sure that pegin isn't a replay, and that
                 // serialized data matches what is expected
+                // We then use peginWitness to determine validity
                 std::pair<uint256, COutPoint> withdraw;
                 setWithdrawsSpent.insert(withdraw);
             } else {
