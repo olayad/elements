@@ -1955,11 +1955,15 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
         if (fScriptChecks) {
             for (unsigned int i = 0; i < tx.vin.size(); i++) {
                 const COutPoint &prevout = tx.vin[i].prevout;
+                // TODO-PEGIN this will return null for peg-in, we will need to construct peg-in scriptPubKey
+                // from peginWitness
                 const CCoins* coins = inputs.AccessCoins(prevout.hash);
                 assert(coins);
 
                 // Verify signature
                 // TODO-PEGIN with no layer violation we can get rid of this fancy ScriptError values
+                // Also generalize the scriptcheck to only validate the scriptpubkey and amount, just like upstream
+                // this way peg-ins will have the propery scriptPubKey and amounts in place, extracted from the pegin auth
                 CCheck* check = new CScriptCheck(*coins, tx, i, flags, cacheStore, &txdata);
                 ScriptError serror = QueueCheck(pvChecks, check);
                 if (serror != SCRIPT_ERR_OK) {
