@@ -1948,14 +1948,13 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
         // Of course, if an assumed valid block is invalid due to false scriptSigs
         // this optimization would allow an invalid chain to be accepted.
         if (fScriptChecks) {
-            CAmount prevValueIn = -1;
             for (unsigned int i = 0; i < tx.vin.size(); i++) {
                 const COutPoint &prevout = tx.vin[i].prevout;
                 const CCoins* coins = inputs.AccessCoins(prevout.hash);
                 assert(coins);
 
                 // Verify signature
-                CCheck* check = new CScriptCheck(*coins, tx, i, prevValueIn, flags, cacheStore, &txdata);
+                CCheck* check = new CScriptCheck(*coins, tx, i, flags, cacheStore, &txdata);
                 ScriptError serror = QueueCheck(pvChecks, check);
                 if (serror != SCRIPT_ERR_OK) {
                     if (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) {
@@ -1965,7 +1964,7 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
                         // arguments; if so, don't trigger DoS protection to
                         // avoid splitting the network between upgraded and
                         // non-upgraded nodes.
-                        CScriptCheck check2(*coins, tx, i, prevValueIn,
+                        CScriptCheck check2(*coins, tx, i,
                                 flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS, cacheStore, &txdata);
                         if (check2())
                             return state.Invalid(false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(serror)));
