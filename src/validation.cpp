@@ -1865,6 +1865,7 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, int nHeight)
 
 bool CScriptCheck::operator()() {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
+    // TODO-PEGIN Peg-in authorization in witness is stripped
     const CScriptWitness *witness = (nIn < ptxTo->wit.vtxinwit.size()) ? &ptxTo->wit.vtxinwit[nIn].scriptWitness : NULL;
     if (!VerifyScript(scriptSig, scriptPubKey, witness, nFlags, CachingTransactionSignatureChecker(ptxTo, nIn, amount, cacheStore, *txdata), &error)) {
         return false;
@@ -1893,6 +1894,8 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
             const COutPoint &prevout = tx.vin[i].prevout;
             if (tx.vin[i].m_is_pegin) {
                 // TODO-PEGIN Peg-in input validation logic
+                // make sure that pegin isn't a replay, and that
+                // serialized data matches what is expected
                 std::pair<uint256, COutPoint> withdraw;
                 setWithdrawsSpent.insert(withdraw);
             } else {
@@ -1920,6 +1923,8 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
         // Tally transaction fees
         if (!tx.HasValidFee())
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-fee-outofrange");
+
+        // Verify transaction balance, rangeproofs, surjectoin proofs
         if (!VerifyAmounts(inputs, tx, pvChecks, cacheStore))
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-in-ne-out", false,
                 strprintf("value in (%s) != value out", FormatMoney(nValueIn)));
@@ -1954,6 +1959,7 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
                 assert(coins);
 
                 // Verify signature
+                // TODO-PEGIN with no layer violation we can get rid of this fancy ScriptError values
                 CCheck* check = new CScriptCheck(*coins, tx, i, flags, cacheStore, &txdata);
                 ScriptError serror = QueueCheck(pvChecks, check);
                 if (serror != SCRIPT_ERR_OK) {
