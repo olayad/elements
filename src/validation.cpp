@@ -2100,7 +2100,7 @@ bool ApplyTxInUndo(const CTxInUndo& undo, CCoinsViewCache& view, const COutPoint
             coins->vout.resize(out.n+1);
         coins->vout[out.n] = undo.txout;
     } else {
-        // TODO make this about witness data, validate logic
+        // TODO-PEGIN make this about witness data, validate logic
         if (!txin.scriptSig.IsWithdrawProof()) {
             // This seems wrong: if (!txin.scriptSig.IsPushOnly())
             fClean = fClean && error("%s: lock spent by non-proof", __func__);
@@ -2169,7 +2169,7 @@ bool DisconnectBlock(const CBlock& block, CValidationState& state, const CBlockI
             for (unsigned int j = tx.vin.size(); j-- > 0;) {
                 const COutPoint &out = tx.vin[j].prevout;
                 const CTxInUndo &undo = txundo.vprevout[j];
-                // TODO make sure we handle pegin rewinds correctly
+                // TODO-PEGIN make sure we handle pegin rewinds correctly
                 if (!ApplyTxInUndo(undo, view, out, tx.vin[j]))
                     fClean = false;
             }
