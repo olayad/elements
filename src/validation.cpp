@@ -707,7 +707,7 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
     for (size_t i = 0; i < tx.vin.size(); ++i)
     {
 
-        // Process peg-in inputs by contructing a pseudo-CTxOut
+        // TODO-PEGIN Process peg-in inputs by contructing a pseudo-CTxOut
         CTxOut pseudoOut;
 /*        if (tx.vin[i].prevout == uint256S("1")) {
             // InWitness must have a single witness stack item of the correct format
@@ -1185,10 +1185,11 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState& state, const C
         if (!view.HaveInputs(tx))
             return state.Invalid(false, REJECT_DUPLICATE, "bad-txns-inputs-spent");
 
+        // Extract peg-in inputs, pass set to mempool entry
         for (const auto& txin : tx.vin) {
             if (txin.m_is_pegin) {
                 std::pair<uint256, COutPoint> outpoint;
-                //TODO Extract genesis hash from witness, create entry
+                //TODO-PEGIN Extract genesis hash from witness, create entry
                 if (view.IsWithdrawSpent(outpoint))
                     return state.Invalid(false, REJECT_CONFLICT, "withdraw-already-claimed");
                 setWithdrawsSpent.insert(outpoint);
@@ -1232,8 +1233,6 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState& state, const C
         CAmount inChainInputValue;
         double dPriority = view.GetPriority(tx, chainActive.Height(), inChainInputValue);
 
-        bool fIsWithdrawLockSpender = false;
-
         // Keep track of transactions that spend a coinbase, which we re-scan
         // during reorgs to ensure COINBASE_MATURITY is still met.
         // Also track withdraw lock spends to allow them through free relay
@@ -1243,9 +1242,6 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState& state, const C
             if (coins->IsCoinBase()) {
                 fSpendsCoinbase = true;
                 break;
-            }
-            if (coins->vout[txin.prevout.n].scriptPubKey.IsWithdrawLock()) {
-                fIsWithdrawLockSpender = true;
             }
         }
 
@@ -1268,7 +1264,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState& state, const C
         }
 
         // No transactions are allowed below minRelayTxFee except from disconnected blocks and withdraw lock spends
-        if (fLimitFree && nModifiedFees < ::minRelayTxFee.GetFee(nSize) && !fIsWithdrawLockSpender)
+        if (fLimitFree && nModifiedFees < ::minRelayTxFee.GetFee(nSize))
         {
             return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "min relay fee not met");
         }
@@ -1479,6 +1475,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState& state, const C
         }
 
         assert(setWithdrawsSpent2 == setWithdrawsSpent);
+        setWithdrawsSpent2.clear();
 
         // Remove conflicting transactions from the mempool
         BOOST_FOREACH(const CTxMemPool::txiter it, allConflicting)
