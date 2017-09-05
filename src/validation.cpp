@@ -1979,11 +1979,6 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
                     // super-majority signaling has occurred.
                     return state.DoS(100,false, REJECT_INVALID, strprintf("mandatory-script-verify-flag-failed (%s)", ScriptErrorString(serror)));
                 }
-                const CConfidentialValue& value = coins->vout[tx.vin[i].prevout.n].nValue;
-                if (value.IsExplicit())
-                    prevValueIn = value.GetAmount();
-                else
-                    prevValueIn = -1;
             }
         }
     }
