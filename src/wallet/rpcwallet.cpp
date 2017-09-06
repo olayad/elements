@@ -3388,46 +3388,33 @@ public:
 static CSecp256k1Init instance_of_csecp256k1;
 }
 
-// TODO-PEGIN re-write for new pegin method
-CScriptID calculate_contract(const CScript& federationRedeemScript, const CBitcoinAddress& destAddress, const unsigned char nonce[16], unsigned char fullcontract[40]) {
-    fullcontract[0] = (unsigned char)'P';
-    fullcontract[1] = (unsigned char)'2';
-    if (destAddress.IsScript())
-        fullcontract[2] = (unsigned char)'S';
-    else
-        fullcontract[2] = (unsigned char)'P';
-    fullcontract[3] = (unsigned char)'H';
-    memcpy(fullcontract + 4, nonce, 16);
-
-    std::vector<unsigned char> destHash;
-    CScript destScript = GetScriptForDestination(destAddress.Get());
-    CScript::iterator scriptIt = destScript.begin();
-    opcodetype opcodeTmp;
-    assert(destScript.GetOp(scriptIt, opcodeTmp, destHash));
-    if (!destAddress.IsScript()) {
-        assert(opcodeTmp == OP_DUP);
-        assert(destScript.GetOp(scriptIt, opcodeTmp, destHash));
-    }
-    assert(opcodeTmp == OP_HASH160);
-    assert(destScript.GetOp(scriptIt, opcodeTmp, destHash));
-    assert(opcodeTmp == 0x14 && destHash.size() == 20);
-    memcpy(fullcontract + 4 + 16, &destHash[0], destHash.size());
-
+/* Takes federation redeeem script and adds SHA2(witnessProgram) as a tweak to each pubkey */
+CScriptID calculate_contract(const CScript& federationRedeemScript, const CScript& witnessProgram) {
     CScript scriptDestination(federationRedeemScript);
+    unsigned char tweak[32];
+    CSHA256().Write(witnessProgram.data(), witnessProgram.size()).Finalize(tweak);
+    int version;
+    std::vector<unsigned char> program;
+    if (!witnessProgram.IsWitnessProgram(version, program)) {
+        assert(false);
+    }
+    txnouttype type;
+    std::vector<std::vector<unsigned char> > solutions;
+    if (!Solver(federationRedeemScript, type, solutions) || (type != TX_WITNESS_V0_SCRIPTHASH && type != TX_WITNESS_V0_KEYHASH)) {
+       assert(false);
+    }
+
     {
         CScript::iterator sdpc = scriptDestination.begin();
         vector<unsigned char> vch;
+        opcodetype opcodeTmp;
         while (scriptDestination.GetOp(sdpc, opcodeTmp, vch))
         {
-            assert((vch.size() == 33 && opcodeTmp < OP_PUSHDATA4) ||
-                   (opcodeTmp <= OP_16 && opcodeTmp >= OP_1) || opcodeTmp == OP_CHECKMULTISIG);
             if (vch.size() == 33)
             {
-                unsigned char tweak[32];
                 size_t pub_len = 33;
                 int ret;
                 unsigned char *pub_start = &(*(sdpc - pub_len));
-                CHMAC_SHA256(pub_start, pub_len).Write(fullcontract, 40).Finalize(tweak);
                 secp256k1_pubkey watchman;
                 secp256k1_pubkey tweaked;
                 ret = secp256k1_ec_pubkey_parse(secp256k1_ctx, &watchman, pub_start, pub_len);
@@ -3470,40 +3457,46 @@ UniValue getpeginaddress(const JSONRPCRequest& request)
     if (!EnsureWalletIsAvailable(request.fHelp))
         return NullUniValue;
 
-    if (request.fHelp || request.params.size() > 1)
+    if (request.fHelp || request.params.size() != 0)
         throw std::runtime_error(
-            "getpeginaddress ( \"account\" )\n"
+            "getpeginaddress\n"
             "\nReturns information needed for claimpegin to move coins to the sidechain.\n"
             "The user should send coins from their Bitcoin wallet to the mainchain_address returned.\n"
             "IMPORTANT: Like getaddress, getpeginaddress adds new secrets to wallet.dat, necessitating backup on a regular basis.\n"
 
-            "\nArguments:\n"
-            "1. \"account\"        (string, optional) The account name for the address to be linked to. if not provided, the default account \"\" is used. It can also be set to the empty string \"\" to represent the default account. The account does not need to exist, it will be created if there is no account by the given name.\n"
             "\nResult:\n"
             "\"mainchain_address\"           (string) Mainchain Bitcoin deposit address to send bitcoin to\n"
-            "\"sidechain_address\"           (string) The sidechain address in this wallet which must be used in `claimpegin` to retrieve pegged-in funds\n"
+            "\"witness_program\"             (string) The witness program in hex that was committed to. This may be required in `claimpegin` to retrieve pegged-in funds\n"
             "\nExamples:\n"
             + HelpExampleCli("getpeginaddress", "")
-            + HelpExampleCli("getpeginaddress", "\"\"")
-            + HelpExampleCli("getpeginaddress", "\"myaccount\"")
-            + HelpExampleRpc("getpeginaddress", "\"myaccount\"")
+            + HelpExampleRpc("getpeginaddress", "")
         );
 
     //Creates new address for receiving unlocked utxos
-    CBitcoinAddress address(CBitcoinAddress(getnewaddress(request).get_str()).GetUnblinded());
+    JSONRPCRequest req;
+    CBitcoinAddress address(CBitcoinAddress(getnewaddress(req).get_str()).GetUnblinded());
+
+    Witnessifier w;
+    CTxDestination dest = address.Get();
+    bool ret = boost::apply_visitor(w, dest);
+    if (!ret) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Public key or redeemscript not known to wallet, or the key is uncompressed");
+    }
+
+    pwalletMain->SetAddressBook(w.result, "", "receive");
+
+    CScript destScript = GetScriptForDestination(address.Get());
+    CScript witProg = GetScriptForWitness(destScript);
 
     //Call contracthashtool, get deposit address on mainchain.
-    unsigned char nonce[16];
-    memset(nonce, 0, sizeof(nonce));
-    unsigned char fullcontract[40];
-    CParentBitcoinAddress destAddr(calculate_contract(Params().GetConsensus().fedpegScript, address, nonce, fullcontract));
+    CParentBitcoinAddress destAddr(calculate_contract(Params().GetConsensus().fedpegScript, witProg));
 
     UniValue fundinginfo(UniValue::VOBJ);
 
-    AuditLogPrintf("%s : getpeginaddress mainchain_address: %s sidechain_address: %s\n", getUser(), destAddr.ToString(), address.ToString());
+    AuditLogPrintf("%s : getpeginaddress mainchain_address: %s witness_program: %s\n", getUser(), destAddr.ToString(), HexStr(witProg));
 
     fundinginfo.pushKV("mainchain_address", destAddr.ToString());
-    fundinginfo.pushKV("sidechain_address", address.ToString());
+    fundinginfo.pushKV("witness_program", HexStr(witProg));
     return fundinginfo;
 }
 
@@ -3591,13 +3584,11 @@ UniValue sendtomainchain(const JSONRPCRequest& request)
 
 extern UniValue sendrawtransaction(const JSONRPCRequest& request);
 
-unsigned int GetPeginTxnOutputIndex(const Sidechain::Bitcoin::CTransaction& txn, const CBitcoinAddress& sidechainAddress, unsigned char* fullcontract)
+unsigned int GetPeginTxnOutputIndex(const Sidechain::Bitcoin::CTransaction& txn, const CScript& witnessProgram)
 {
-    unsigned char nonce[16];
-    memset(nonce, 0, sizeof(nonce));
     unsigned int nOut = 0;
     //Call contracthashtool
-    CScript mainchain_script = GetScriptForDestination(calculate_contract(Params().GetConsensus().fedpegScript, sidechainAddress, &nonce[0], fullcontract));
+    CScript mainchain_script = GetScriptForDestination(calculate_contract(Params().GetConsensus().fedpegScript, witnessProgram));
     for (; nOut < txn.vout.size(); nOut++)
         if (txn.vout[nOut].scriptPubKey == mainchain_script)
             break;
@@ -3616,7 +3607,7 @@ UniValue claimpegin(const JSONRPCRequest& request)
             "\nArguments:\n"
             "1. \"bitcoinTx\"         (string, required) The raw bitcoin transaction (in hex) depositing bitcoin to the mainchain_address generated by getpeginaddress\n"
             "2. \"txoutproof\"        (string, required) A rawtxoutproof (in hex) generated by bitcoind's `gettxoutproof` containing a proof of only bitcoinTx\n"
-            "3. \"sidechain_address\"  (string, optional) The sidechain_address generated by getpeginaddress. Only needed if not in wallet.\n"
+            "3. \"witness_program\"   (string, optional) The witness program generated by getpeginaddress. Only needed if not in wallet.\n"
             "\nResult:\n"
             "\"txid\"                 (string) Txid of the resulting sidechain transaction\n"
             "\nExamples:\n"
@@ -3667,20 +3658,33 @@ UniValue claimpegin(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "The txoutproof must contain bitcoinTx and only bitcoinTx");
 
     unsigned int nOut = 0;
-    unsigned char fullcontract[40];
-    CBitcoinAddress sidechainAddress;
     if (request.params.size() > 2) {
-        sidechainAddress = CBitcoinAddress(request.params[2].get_str());
-        if (!sidechainAddress.IsValid()) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Given sidechain_address is invalid.");
+        int version;
+        std::vector<unsigned char> witnessProgram;
+        CScript witnessProgScript = CScript(ParseHex(request.params[2].get_str()));
+        if (!witnessProgScript.IsWitnessProgram(version, witnessProgram) || version != 0) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, "Given witness_program is not a valid v0 witness program.");
         }
-        nOut = GetPeginTxnOutputIndex(txBTC, sidechainAddress, fullcontract);
+        nOut = GetPeginTxnOutputIndex(txBTC, witnessProgScript);
     }
     else {
-        // Look through address book for pegin contract value
+        // Look through address book for pegin contract value by extracting the unlderlying witness program from p2sh-p2wpkh
         for (std::map<CTxDestination, CAddressBookData>::const_iterator iter = pwalletMain->mapAddressBook.begin(); iter != pwalletMain->mapAddressBook.end(); ++iter) {
-            sidechainAddress = CBitcoinAddress(iter->first);
-            nOut = GetPeginTxnOutputIndex(txBTC, sidechainAddress, fullcontract);
+            CBitcoinAddress sidechainAddress(CBitcoinAddress(iter->first));
+            // Get witness associated witness program
+            CKeyID keyID;
+            if (!sidechainAddress.GetKeyID(keyID)) {
+                continue;
+            }
+            CScript redeemScript;
+            pwalletMain->GetCScript(keyID, redeemScript);
+            int version;
+            std::vector<unsigned char> witnessProgram;
+            // Only process witness v0 programs
+            if (!redeemScript.IsWitnessProgram(version, witnessProgram) || version != 0) {
+                continue;
+            }
+            nOut = GetPeginTxnOutputIndex(txBTC, redeemScript);
             if (nOut != txBTC.vout.size()) {
                 break;
             }
@@ -3692,6 +3696,7 @@ UniValue claimpegin(const JSONRPCRequest& request)
 
     uint256 genesisBlockHash = Params().ParentGenesisBlockHash();
 
+    /*
     //Output we're re-locking
     CScript relock_spk;
     relock_spk << std::vector<unsigned char>(genesisBlockHash.begin(), genesisBlockHash.end());
@@ -3767,10 +3772,12 @@ UniValue claimpegin(const JSONRPCRequest& request)
 	{
 		pnode->PushInventory(inv);
 	});
-	
 	AuditLogPrintf("%s : claimpegin %s\n", getUser(), finalTxn.ToString());
 
     return finalTxn.GetHash().GetHex();
+
+	*/
+    return NullUniValue;
 }
 
 UniValue issueasset(const JSONRPCRequest& request)
