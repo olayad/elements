@@ -254,7 +254,6 @@ public:
         GenerateAssetEntropy(entropy,  COutPoint(uint256(commit), 0), parentGenesisBlockHash);
         CalculateAsset(consensus.pegged_asset, entropy);
 
-        genesis = CreateGenesisBlock(consensus, strNetworkID, defaultRegtestScript, 1296688602, genesisChallengeScript, 1, MAX_MONEY, 100, consensus.pegged_asset);
         genesis = CreateGenesisBlock(consensus, strNetworkID, 1296688602, genesisChallengeScript, 1);
         consensus.hashGenesisBlock = genesis.GetHash();
 
