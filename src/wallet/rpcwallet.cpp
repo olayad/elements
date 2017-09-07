@@ -3400,7 +3400,7 @@ CScriptID calculate_contract(const CScript& federationRedeemScript, const CScrip
     }
     txnouttype type;
     std::vector<std::vector<unsigned char> > solutions;
-    if (!Solver(federationRedeemScript, type, solutions) || (type != TX_WITNESS_V0_SCRIPTHASH && type != TX_WITNESS_V0_KEYHASH)) {
+    if (!Solver(federationRedeemScript, type, solutions) || (type != TX_WITNESS_V0_SCRIPTHASH && type != TX_WITNESS_V0_KEYHASH && type != TX_TRUE)) {
        assert(false);
     }
 
@@ -3657,11 +3657,12 @@ UniValue claimpegin(const JSONRPCRequest& request)
     if (txHashes.size() != 1 || txHashes[0] != txBTC.GetHash())
         throw JSONRPCError(RPC_INVALID_PARAMETER, "The txoutproof must contain bitcoinTx and only bitcoinTx");
 
-    unsigned int nOut = 0;
+    unsigned int nOut = txBTC.vout.size();
     if (request.params.size() > 2) {
-        int version;
+        int version = -1;
         std::vector<unsigned char> witnessProgram;
-        CScript witnessProgScript = CScript(ParseHex(request.params[2].get_str()));
+        std::vector<unsigned char> witnessBytes(ParseHex(request.params[2].get_str()));
+        CScript witnessProgScript(witnessBytes.begin(), witnessBytes.end());
         if (!witnessProgScript.IsWitnessProgram(version, witnessProgram) || version != 0) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Given witness_program is not a valid v0 witness program.");
         }
@@ -3671,20 +3672,14 @@ UniValue claimpegin(const JSONRPCRequest& request)
         // Look through address book for pegin contract value by extracting the unlderlying witness program from p2sh-p2wpkh
         for (std::map<CTxDestination, CAddressBookData>::const_iterator iter = pwalletMain->mapAddressBook.begin(); iter != pwalletMain->mapAddressBook.end(); ++iter) {
             CBitcoinAddress sidechainAddress(CBitcoinAddress(iter->first));
-            // Get witness associated witness program
-            CKeyID keyID;
-            if (!sidechainAddress.GetKeyID(keyID)) {
-                continue;
-            }
-            CScript redeemScript;
-            pwalletMain->GetCScript(keyID, redeemScript);
+            CScript witnessProgramScript = GetScriptForWitness(GetScriptForDestination(sidechainAddress.Get()));
             int version;
             std::vector<unsigned char> witnessProgram;
             // Only process witness v0 programs
-            if (!redeemScript.IsWitnessProgram(version, witnessProgram) || version != 0) {
+            if (!witnessProgramScript.IsWitnessProgram(version, witnessProgram) || version != 0) {
                 continue;
             }
-            nOut = GetPeginTxnOutputIndex(txBTC, redeemScript);
+            nOut = GetPeginTxnOutputIndex(txBTC, witnessProgramScript);
             if (nOut != txBTC.vout.size()) {
                 break;
             }
@@ -3696,87 +3691,10 @@ UniValue claimpegin(const JSONRPCRequest& request)
 
     uint256 genesisBlockHash = Params().ParentGenesisBlockHash();
 
-    /*
-    //Output we're re-locking
-    CScript relock_spk;
-    relock_spk << std::vector<unsigned char>(genesisBlockHash.begin(), genesisBlockHash.end());
-    relock_spk << OP_WITHDRAWPROOFVERIFY;
+    // Manually construct peg-in transaction, sign it, and send it off.
+    // Decrement the output value as much as needed given the total vsize to
+    // pay the fees.
 
-    if (value > MAX_MONEY / 200)
-        throw JSONRPCError(RPC_VERIFY_REJECTED, "IsStandard rules prevent pegging-in > 0.105 million BTC reliably at a time - please work with your functionary to mine a large lock-merge transaction first");
-
-    //Pad the locked outputs by the IsStandard lock dust value
-    CTxOut dummyTxOut(Params().GetConsensus().pegged_asset, 0, relock_spk);
-    CAmount lockDust(0);//dummyTxOut.GetDustThreshold(withdrawLockTxFee));
-
-    LOCK(cs_main);
-
-    std::vector<std::pair<COutPoint, CAmount> > lockedUTXO;
-//    if (!GetLockedOutputs(genesisBlockHash, value+lockDust, lockedUTXO))
-//        throw JSONRPCError(RPC_INVALID_PARAMETER, "Failed to find inputs with sufficient value - are you sure bitcoinTx is valid?");
-
-    while (lockedUTXO.size() != 1) {
-        CMutableTransaction mtxn;
-        mtxn.vin.push_back(CTxIn(lockedUTXO[0].first.hash, lockedUTXO[0].first.n, CScript(), ~(uint32_t)0));
-        mtxn.vin.push_back(CTxIn(lockedUTXO[1].first.hash, lockedUTXO[1].first.n, CScript(), ~(uint32_t)0));
-        CAmount out_value = lockedUTXO[0].second + lockedUTXO[1].second;
-        mtxn.vout.push_back(CTxOut(Params().GetConsensus().pegged_asset, out_value, relock_spk));
-
-        CValidationState state;
-        bool fMissingInputs;
-        if (!AcceptToMemoryPool(mempool, state, MakeTransactionRef(mtxn), false, &fMissingInputs, NULL, false, true))
-            throw JSONRPCError(RPC_TRANSACTION_REJECTED, strprintf("Failed to merge locked outputs, please try again later (%i: %s)", state.GetRejectCode(), state.GetRejectReason()));
-
-		CInv inv(MSG_TX, mtxn.GetHash());
-		g_connman->ForEachNode([&inv](CNode* pnode)
-		{
-			pnode->PushInventory(inv);
-		});
-
-        lockedUTXO.erase(lockedUTXO.begin(), lockedUTXO.begin() + 2);
-        lockedUTXO.push_back(std::make_pair(COutPoint(mtxn.GetHash(), 0), out_value));
-    }
-
-    assert(lockedUTXO.size() == 1 && lockedUTXO[0].second >= value+lockDust);
-
-    uint256 utxo_txid(lockedUTXO[0].first.hash);
-    uint32_t utxo_vout = lockedUTXO[0].first.n;
-    CAmount utxo_value = lockedUTXO[0].second;
-
-
-    CScript scriptSig;
-    scriptSig << std::vector<unsigned char>(fullcontract, fullcontract + 40);
-    scriptSig.PushWithdraw(txOutProofData);
-    scriptSig.PushWithdraw(txData);
-    scriptSig << nOut;
-
-    //Build the transaction
-    CMutableTransaction mtxn;
-    CTxIn txin(utxo_txid, utxo_vout, scriptSig, ~(uint32_t)0);
-    CTxOut txout(Params().GetConsensus().pegged_asset, value, GetScriptForDestination(sidechainAddress.Get()));
-    CTxOut txrelock(Params().GetConsensus().pegged_asset, utxo_value - value, relock_spk);
-    mtxn.vin.push_back(txin);
-    mtxn.vout.push_back(txout);
-    mtxn.vout.push_back(txrelock);
-
-    //No signing needed, just send
-    CTransaction finalTxn(mtxn);
-
-	CValidationState state;
-	bool fMissingInputs;
-	if (!AcceptToMemoryPool(mempool, state, MakeTransactionRef(finalTxn), false, &fMissingInputs, NULL, false, true))
-		throw JSONRPCError(RPC_TRANSACTION_REJECTED, strprintf("Failed to merge locked outputs, please try again later (%i: %s)", state.GetRejectCode(), state.GetRejectReason()));
-
-	CInv inv(MSG_TX, finalTxn.GetHash());
-	g_connman->ForEachNode([&inv](CNode* pnode)
-	{
-		pnode->PushInventory(inv);
-	});
-	AuditLogPrintf("%s : claimpegin %s\n", getUser(), finalTxn.ToString());
-
-    return finalTxn.GetHash().GetHex();
-
-	*/
     return NullUniValue;
 }
 
