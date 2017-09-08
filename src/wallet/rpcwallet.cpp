@@ -3623,7 +3623,6 @@ UniValue claimpegin(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_TYPE_ERROR, "the first two arguments must be hex strings");
     }
 
-
     std::vector<unsigned char> txData = ParseHex(request.params[0].get_str());
     CDataStream ssTx(txData, SER_NETWORK, PROTOCOL_VERSION);
     Sidechain::Bitcoin::CTransactionRef txBTCRef;
