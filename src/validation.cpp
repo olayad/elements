@@ -1173,13 +1173,17 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState& state, const C
             return state.Invalid(false, REJECT_DUPLICATE, "bad-txns-inputs-spent");
 
         // Extract peg-in inputs, pass set to mempool entry. Validity of pegins checked in CheckInputs
-        for (const auto& txin : tx.vin) {
-            if (txin.m_is_pegin) {
-                std::pair<uint256, COutPoint> outpoint;
-                //TODO-PEGIN Extract genesis hash from witness, create entry
-                if (view.IsWithdrawSpent(outpoint))
+        for (unsigned int i = 0; i < tx.vin.size(); i++) {
+            if (tx.vin[i].m_is_pegin) {
+                // Quick check of pegin witness to extract db entry
+                if (tx.wit.vtxinwit.size() <= i || tx.wit.vtxinwit[i].pegin_witness.stack.size() < 8) {
+                    return state.Invalid(false, REJECT_INVALID, "pegin-no-witness");
+                }
+                std::pair<uint256, COutPoint> pegin = std::make_pair(uint256(tx.wit.vtxinwit[i].pegin_witness.stack[4]), tx.vin[i].prevout);
+                if (view.IsWithdrawSpent(pegin)) {
                     return state.Invalid(false, REJECT_CONFLICT, "withdraw-already-claimed");
-                setWithdrawsSpent.insert(outpoint);
+                }
+                setWithdrawsSpent.insert(pegin);
             }
         }
 
@@ -1879,12 +1883,19 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
         {
             const COutPoint &prevout = tx.vin[i].prevout;
             if (tx.vin[i].m_is_pegin) {
-                // TODO-PEGIN Peg-in input validation logic
-                // make sure that pegin isn't a replay, and that
-                // serialized data matches what is expected
-                // We then use pegin_witness to determine validity
-                std::pair<uint256, COutPoint> withdraw;
-                setWithdrawsSpent.insert(withdraw);
+                // Check existence and validity of pegin witness
+                if (tx.wit.vtxinwit.size() <= i || !IsValidPeginWitness(tx.wit.vtxinwit[i].pegin_witness)) {
+                    return false;
+                }
+                std::pair<uint256, COutPoint> pegin = std::make_pair(uint256(tx.wit.vtxinwit[i].pegin_witness.stack[4]), prevout);
+                if (inputs.IsWithdrawSpent(pegin)) {
+                    return state.Invalid(false, REJECT_INVALID, "bad-txns-double-withdraw", strprintf("Double-withdraw of %s:%d", prevout.hash.ToString(), prevout.n));
+                }
+                if (setWithdrawsSpent.count(pegin)) {
+                    return state.DoS(100, false, REJECT_INVALID, "bad-txns-double-withdraw-in-obj", false,
+                        strprintf("Double-withdraw of %s:%d in single tx/block", prevout.hash.ToString(), prevout.n));
+                }
+                setWithdrawsSpent.insert(pegin);
             } else {
                 const CCoins *coins = inputs.AccessCoins(prevout.hash);
                 assert(coins);
@@ -1942,9 +1953,19 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
         if (fScriptChecks) {
             for (unsigned int i = 0; i < tx.vin.size(); i++) {
                 const COutPoint &prevout = tx.vin[i].prevout;
-                // TODO-PEGIN this will return null for peg-in, we will need to construct peg-in scriptPubKey
+                // If input is peg-in, create "coin" to evaluate against
+                CCoins pegin_coin;
+                if (tx.vin[i].m_is_pegin) {
+                    CMutableTransaction mtx;
+                    mtx.vout.resize(prevout.n);
+                    mtx.vout.push_back(GetPeginOutputFromWitness(tx.wit.vtxinwit[i].pegin_witness));
+                    CTransaction tx(mtx);
+                    // Height of "output" in script evaluation will be 0
+                    pegin_coin.FromTx(tx, 0);
+                }
+
                 // from pegin_witness
-                const CCoins* coins = inputs.AccessCoins(prevout.hash);
+                const CCoins* coins = tx.vin[i].m_is_pegin ? &pegin_coin : inputs.AccessCoins(prevout.hash);
                 assert(coins);
 
                 // Verify signature
@@ -2306,7 +2327,7 @@ bool BitcoindRPCCheck(const bool init)
     return true;
 }
 
-bool IsValidPeginWitness(CScriptWitness& pegin_witness) {
+bool IsValidPeginWitness(const CScriptWitness& pegin_witness) {
 
     // Format on stack is as follows:
     // 1) txid - txid of parent chain transaction
@@ -2322,7 +2343,7 @@ bool IsValidPeginWitness(CScriptWitness& pegin_witness) {
     // of Bitcoin serialization. This is useful for further abstraction by outsourcing
     // the other validity checks to RPC calls. The last two stack items
 
-    std::vector<std::vector<unsigned char> >& stack = pegin_witness.stack;
+    const std::vector<std::vector<unsigned char> >& stack = pegin_witness.stack;
     // Must include all elements
     if (stack.size() != 7) {
         return false;
@@ -2462,7 +2483,7 @@ bool IsValidPeginWitness(CScriptWitness& pegin_witness) {
 }
 
 // Constructs unblinded output to be used in amount and scriptpubkey checks during pegin
-CTxOut GetPeginOutputFromWitness(CScriptWitness& pegin_witness) {
+CTxOut GetPeginOutputFromWitness(const CScriptWitness& pegin_witness) {
     // Must check validity first for formatting reasons
     assert(IsValidPeginWitness(pegin_witness));
 
