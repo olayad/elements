@@ -3666,6 +3666,7 @@ UniValue claimpegin(const JSONRPCRequest& request)
 
     uint256 genesisBlockHash = Params().ParentGenesisBlockHash();
 
+    // TODO-PEGIN finish claimpegin
     // Manually construct peg-in transaction, sign it, and send it off.
     // Decrement the output value as much as needed given the total vsize to
     // pay the fees.
