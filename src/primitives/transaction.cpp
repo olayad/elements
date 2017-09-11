@@ -96,7 +96,7 @@ std::string CTxIn::ToString() const
 CMutableTransaction::CMutableTransaction() : nVersion(CTransaction::CURRENT_VERSION), vin(), vout(), wit(), nLockTime(0) {}
 CMutableTransaction::CMutableTransaction(const CTransaction& tx) : nVersion(tx.nVersion), vin(tx.vin), vout(tx.vout), wit(tx.wit), nLockTime(tx.nLockTime) {}
 
-// TODO-PEGIN discuss with mark
+// TODO-PEGIN update the description and picture (remove for now?)
 /**
  * The input witness consists of three elements, two of which are
  * optional. The optional elements have to do with asset issuance

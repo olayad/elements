@@ -215,62 +215,8 @@ unsigned int CScript::GetSigOpCount(const CScript& scriptSig) const
     return subscript.GetSigOpCount(true);
 }
 
-bool CScript::IsWithdrawProof() const
-{
-    // Format is <contract> <merkleBlock>xN <N> <locking tx>xM <M> <output index>
-    // for at least 6 total pushes
-    // Here we simply check that the script is push-only and has at least 6 pushes.
-    // The output must be P2SH to the appropriate script
-    const_iterator pc = begin();
-    opcodetype opcode;
-    uint32_t push_count = 0;
-    while (pc < end())
-    {
-        if (!GetOp(pc, opcode))
-            return false;
-        if (opcode > OP_16 || opcode == OP_RESERVED)
-            return false;
-        push_count++;
-    }
-    return push_count >= 6;
-}
-
-bool CScript::IsWithdrawLock() const
-{
-    // Locks look like [<chaindest> OP_DROP] <genesishash> OP_WITHDRAWPROOFVERIFY
-    // This function must return true for an OP_WITHDRAWPROOFVERIFY opcode to execute.
-    // We require all pushes be in their minimal form, to make inspection of
-    // withdraw locks a purely byte-matching affair.
-    const_iterator pc = begin();
-    vector<unsigned char> data;
-    opcodetype opcode;
-
-    if (!GetOp(pc, opcode, data))
-        return false;
-    if (opcode == 24 && data.size() == 24) { // 4 byte type + 20 byte destination is suggested
-        if (!GetOp(pc, opcode, data) || opcode != OP_DROP || data.size() != 0)
-            return false;
-
-        if (!GetOp(pc, opcode, data))
-            return false;
-    }
-
-    if (opcode != 32 || data.size() != 32)
-        return false;
-
-    if (!GetOp(pc, opcode, data) || opcode != OP_WITHDRAWPROOFVERIFY || data.size() != 0)
-        return false;
-
-    if (GetOp(pc, opcode))
-        return false;
-
-    return true;
-}
-
 uint256 CScript::GetWithdrawLockGenesisHash() const
 {
-    assert(IsWithdrawLock());
-
     const_iterator pc = begin();
     opcodetype opcode;
     vector<unsigned char> vchgenesishash;
@@ -310,8 +256,6 @@ static bool PopWithdrawPush(vector<vector<unsigned char> >& pushes, vector<unsig
 
 COutPoint CScript::GetWithdrawSpent() const
 {
-    assert(IsWithdrawProof());
-
     try {
         const_iterator pc = begin();
         opcodetype opcode;

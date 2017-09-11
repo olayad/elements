@@ -2104,7 +2104,7 @@ bool ApplyTxInUndo(const CTxInUndo& undo, CCoinsViewCache& view, const COutPoint
         coins->vout[out.n] = undo.txout;
     } else {
         // TODO-PEGIN make this about witness data, validate logic
-        if (!txin.scriptSig.IsWithdrawProof()) {
+        if (false)//!txin.scriptSig.IsWithdrawProof()) {
             // This seems wrong: if (!txin.scriptSig.IsPushOnly())
             fClean = fClean && error("%s: lock spent by non-proof", __func__);
         } else {

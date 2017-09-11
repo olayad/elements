@@ -3533,40 +3533,16 @@ UniValue sendtomainchain(const JSONRPCRequest& request)
     if (nAmount <= 0)
         throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for send");
 
-    // Parse Bitcoin address for asm field
+    // Parse Bitcoin address for destination, embed script
     CScript scriptPubKeyMainchain(GetScriptForDestination(address.Get()));
-    CScript::const_iterator pc(scriptPubKeyMainchain.begin());
-    CScript::const_iterator pend(scriptPubKeyMainchain.end());
-    opcodetype type;
-    vector<unsigned char> vData;
-    while (pc != pend) {
-       scriptPubKeyMainchain.GetOp(pc, type, vData);
-       if (type == OP_HASH160) {
-           scriptPubKeyMainchain.GetOp(pc, type, vData);
-           break;
-       }
-    }
-    assert(pc != pend && type == 0x14);
-
-    CScript scriptPubKey;
-
-    vector<unsigned char> hex;
-    hex.push_back((unsigned char)'P');
-    hex.push_back((unsigned char)'2');
-    if (scriptPubKeyMainchain.IsPayToScriptHash())
-        hex.push_back((unsigned char)'S');
-    else
-        hex.push_back((unsigned char)'P');
-    hex.push_back((unsigned char)'H');
-    hex.insert(hex.end(), vData.begin(), vData.end());
 
     uint256 genesisBlockHash = Params().ParentGenesisBlockHash();
 
-    scriptPubKey << hex;
-    scriptPubKey << OP_DROP;
+    // Asset type is implicit, no need to add to script
+    CScript scriptPubKey;
+    scriptPubKey << OP_RETURN;
     scriptPubKey << std::vector<unsigned char>(genesisBlockHash.begin(), genesisBlockHash.end());
-    scriptPubKey << OP_WITHDRAWPROOFVERIFY;
-    assert(scriptPubKey.IsWithdrawLock());
+    scriptPubKey << std::vector<unsigned char>(scriptPubKeyMainchain.begin(), scriptPubKeyMainchain.end());
 
     EnsureWalletIsUnlocked();
 
