@@ -709,14 +709,8 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
     // Tally up value commitments, check balance
     for (size_t i = 0; i < tx.vin.size(); ++i)
     {
-        const CTxIn& input = tx.vin[i];
-        // TODO-PEGIN Process peg-in inputs by contructing a pseudo-CTxOut
-        CTxOut pseudoOut;
-        if (input.m_is_pegin) {
-
-        }
-
-        const CTxOut out = tx.vin[i].m_is_pegin ? pseudoOut : cache.GetOutputFor(tx.vin[i]);
+        // Assumes IsValidPeginWitness has been called successfully
+        const CTxOut out = tx.vin[i].m_is_pegin ? GetPeginOutputFromWitness(tx.wit.vtxinwit[i].pegin_witness) : cache.GetOutputFor(tx.vin[i]);
         const CConfidentialValue& val = out.nValue;
         const CConfidentialAsset& asset = out.nAsset;
 
@@ -1969,9 +1963,6 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
                 assert(coins);
 
                 // Verify signature
-                // TODO-PEGIN with no layer violation we can get rid of this fancy ScriptError values
-                // Also generalize the scriptcheck to only validate the scriptpubkey and amount, just like upstream
-                // this way peg-ins will have the propery scriptPubKey and amounts in place, extracted from the pegin auth
                 CCheck* check = new CScriptCheck(*coins, tx, i, flags, cacheStore, &txdata);
                 ScriptError serror = QueueCheck(pvChecks, check);
                 if (serror != SCRIPT_ERR_OK) {
