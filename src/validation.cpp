@@ -22,6 +22,9 @@
 #include "pow.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
+#include "primitives/bitcoin/block.h"
+#include "primitives/bitcoin/transaction.h"
+#include "primitives/bitcoin/merkleblock.h"
 #include "random.h"
 #include "script/script.h"
 #include "script/sigcache.h"
@@ -706,28 +709,12 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
     // Tally up value commitments, check balance
     for (size_t i = 0; i < tx.vin.size(); ++i)
     {
-
+        const CTxIn& input = tx.vin[i];
         // TODO-PEGIN Process peg-in inputs by contructing a pseudo-CTxOut
         CTxOut pseudoOut;
-/*        if (tx.vin[i].prevout == uint256S("1")) {
-            // InWitness must have a single witness stack item of the correct format
-            // and have no issuances or associated witnesses
-            if (tx.wit.vtxinwit.size() <= i || !tx.vin[i].assetIssuance.IsNull()) {
-                return false;
-            }
-            CTxInWitness& txinwit = tx.wit.vtxinwit[i];
-            if (txinwit.scriptWitness.size() != 1 || !txinwit.vchIssuanceAmountRangeproof.IsNull()
-                    || !txinwit.vchInflationKeysRangeproof.IsNull()) {
-                return false;
-            }
-            CScript pegWitness(tx.wit.vtxinwit[i].scriptWitness.back().begin(), tx.wit.vtxinwit[i].scriptWitness.back().end());
-            if (!pegWitness.IsPeginWitness()) {
-                return false;
-            }
-            if (!GetBoolArg("-validatepegin", DEFAULT_VALIDATE_PEGIN)) {
-                return true;
-            }
-        }*/
+        if (input.m_is_pegin) {
+
+        }
 
         const CTxOut out = tx.vin[i].m_is_pegin ? pseudoOut : cache.GetOutputFor(tx.vin[i]);
         const CConfidentialValue& val = out.nValue;
@@ -1895,7 +1882,7 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
                 // TODO-PEGIN Peg-in input validation logic
                 // make sure that pegin isn't a replay, and that
                 // serialized data matches what is expected
-                // We then use peginWitness to determine validity
+                // We then use pegin_witness to determine validity
                 std::pair<uint256, COutPoint> withdraw;
                 setWithdrawsSpent.insert(withdraw);
             } else {
@@ -1956,7 +1943,7 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
             for (unsigned int i = 0; i < tx.vin.size(); i++) {
                 const COutPoint &prevout = tx.vin[i].prevout;
                 // TODO-PEGIN this will return null for peg-in, we will need to construct peg-in scriptPubKey
-                // from peginWitness
+                // from pegin_witness
                 const CCoins* coins = inputs.AccessCoins(prevout.hash);
                 assert(coins);
 
@@ -2317,6 +2304,130 @@ bool BitcoindRPCCheck(const bool init)
         pblocktree->WriteInvalidBlockQueue(vblocksToReconsiderAgain);
         }
     return true;
+}
+
+bool IsValidPeginWitness(CScriptWitness& pegin_witness) {
+
+    // Format on stack is as follows:
+    // 1) txid - txid of parent chain transaction
+    // 2) nout - output number that is a peg-in output
+    // 3) value - the value of the pegin output
+    // 4) asset type - the asset type being pegged in
+    // 5) genesis blockhash - genesis block of the parent chain
+    // 6) witness program - program that script evaluation will be evaluated against
+    // 7) serialized transaction - serialized bitcoin transaction
+    // 8) txout proof - merkle proof connecting transaction to header
+    //
+    // First 6 values are enough to validate a peg-in without any internal knowledge
+    // of Bitcoin serialization. This is useful for further abstraction by outsourcing
+    // the other validity checks to RPC calls. The last two stack items
+
+    std::vector<std::vector<unsigned char> >& stack = pegin_witness.stack;
+    // Must include all elements
+    if (stack.size() != 7) {
+        return false;
+    }
+
+    // Txid must be included
+    if (stack[0].size() != 32) {
+        return false;
+    }
+    uint256 txid(stack[0]);
+
+    // Get output number
+    int nOut = CScriptNum(stack[1], true).getint();
+
+    // Get output value
+    CAmount value = CScriptNum(stack[2], true).getint();
+
+    // Get asset type
+    if (stack[3].size() != 32) {
+        return false;
+    }
+    CAsset asset(stack[3]);
+
+    // Get genesis blockhash
+    if (stack[4].size() != 32) {
+        return false;
+    }
+    uint256 gen_hash(stack[4]);
+
+    // Get witness program
+    CScript witness_program(stack[5]);
+
+    // Get serialized transaction
+    Sidechain::Bitcoin::CTransactionRef pegtx;
+	try {
+		CDataStream pegtx_stream(stack[6], SER_NETWORK, PROTOCOL_VERSION);
+        pegtx_stream >> pegtx;
+        if (!pegtx_stream.empty()) {
+	        return false;
+		}
+	} catch (std::exception& e) {
+        // Invalid encoding of transaction
+        return false;
+    }
+
+    // Get txout proof
+    Sidechain::Bitcoin::CMerkleBlock merkle_block;
+    std::vector<uint256> txHashes;
+    std::vector<unsigned int> txIndices;
+
+	try {
+        CDataStream merkleBlockStream(stack[7], SER_NETWORK, PROTOCOL_VERSION);
+        merkleBlockStream >> merkle_block;
+        if (!merkleBlockStream.empty() || !CheckBitcoinProof(merkle_block.header.GetHash(), merkle_block.header.nBits)) {
+           return false;
+        }
+        if (merkle_block.txn.ExtractMatches(txHashes, txIndices) != merkle_block.header.hashMerkleRoot || txHashes.size() != 1) {
+            return false;
+        }
+	} catch (std::exception& e) {
+        // Invalid encoding of merkle block
+        return false;
+    }
+
+    // Check that transaction matches txid
+    if (pegtx->GetHash() != txid) {
+        return false;
+    }
+
+    // Check that the merkle proof corresponds to the txid
+    if (txid != txHashes[0]) {
+        return false;
+    }
+
+    // Check the genesis block corresponds to a valid peg (only one for now)
+    if (gen_hash != Params().ParentGenesisBlockHash()) {
+        return false;
+    }
+
+    // Check the asset type corresponds to a valid pegged asset (only one for now)
+    if (asset != Params().GetConsensus().pegged_asset) {
+        return false;
+    }
+
+    // Check the transaction nout/value matches
+    if (nOut < 0 || (unsigned int)nOut >= pegtx->vout.size() || value != pegtx->vout[nOut].nValue) {
+        return false;
+    }
+
+    // Check that the witness program matches the p2ch on the transaction output
+
+    // Finally, validate peg-in via rpc call
+    if (GetBoolArg("-validatepegin", DEFAULT_VALIDATE_PEGIN)) {
+        uint256 hash;
+        return IsConfirmedBitcoinBlock(Params().ParentGenesisBlockHash(), merkle_block.header.GetHash(), GetArg("-peginconfirmationdepth", DEFAULT_PEGIN_CONFIRMATION_DEPTH));
+    }
+    return true;
+}
+
+// Constructs unblinded output to be used in amount and scriptpubkey checks during pegin
+CTxOut GetPeginOutputFromWitness(CScriptWitness& pegin_witness) {
+    // Must check validity first for formatting reasons
+    assert(IsValidPeginWitness(pegin_witness));
+
+    return CTxOut(CAsset(pegin_witness.stack[3]), CScriptNum(pegin_witness.stack[2], true).getint(), CScript(pegin_witness.stack[5]));
 }
 
 // Protected by cs_main

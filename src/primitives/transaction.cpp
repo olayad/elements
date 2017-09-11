@@ -121,7 +121,7 @@ uint256 CTxInWitness::GetHash() const
     leaves.push_back(SerializeHash(vchIssuanceAmountRangeproof, SER_GETHASH, 0));
     leaves.push_back(SerializeHash(vchInflationKeysRangeproof, SER_GETHASH, 0));
     leaves.push_back(SerializeHash(scriptWitness.stack, SER_GETHASH, 0));
-    leaves.push_back(SerializeHash(peginWitness.stack, SER_GETHASH, 0));
+    leaves.push_back(SerializeHash(pegin_witness.stack, SER_GETHASH, 0));
     return ComputeFastMerkleRoot(leaves);
 }
 

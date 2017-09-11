@@ -515,7 +515,7 @@ public:
     std::vector<unsigned char> vchInflationKeysRangeproof;
     CScriptWitness scriptWitness;
     // Re-use script witness struct to include its own witness
-    CScriptWitness peginWitness;
+    CScriptWitness pegin_witness;
 
     ADD_SERIALIZE_METHODS;
 
@@ -525,7 +525,7 @@ public:
         READWRITE(vchIssuanceAmountRangeproof);
         READWRITE(vchInflationKeysRangeproof);
         READWRITE(scriptWitness.stack);
-        READWRITE(peginWitness.stack);
+        READWRITE(pegin_witness.stack);
     }
 
     CTxInWitness() { }
@@ -533,14 +533,14 @@ public:
     bool IsNull() const
     {
         return vchIssuanceAmountRangeproof.empty() && vchInflationKeysRangeproof.empty() && scriptWitness.IsNull()
-            && peginWitness.IsNull();
+            && pegin_witness.IsNull();
     }
     void SetNull()
     {
         vchIssuanceAmountRangeproof.clear();
         vchInflationKeysRangeproof.clear();
         scriptWitness.stack.clear();
-        peginWitness.stack.clear();
+        pegin_witness.stack.clear();
     }
 
     uint256 GetHash() const;
