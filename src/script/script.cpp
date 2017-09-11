@@ -215,25 +215,6 @@ unsigned int CScript::GetSigOpCount(const CScript& scriptSig) const
     return subscript.GetSigOpCount(true);
 }
 
-uint256 CScript::GetWithdrawLockGenesisHash() const
-{
-    const_iterator pc = begin();
-    opcodetype opcode;
-    vector<unsigned char> vchgenesishash;
-
-    bool ret;
-    ret = GetOp(pc, opcode, vchgenesishash);
-    assert(ret);
-    if (vchgenesishash.size() != 32) {
-        ret = GetOp(pc, opcode);
-        assert(ret && opcode == OP_DROP);
-        ret = GetOp(pc, opcode, vchgenesishash);
-        assert(ret);
-    }
-    assert(vchgenesishash.size() == 32);
-    return uint256(vchgenesishash);
-}
-
 static bool PopWithdrawPush(vector<vector<unsigned char> >& pushes, vector<unsigned char> *read=NULL) {
     if (pushes.empty())
         return false;
@@ -252,42 +233,6 @@ static bool PopWithdrawPush(vector<vector<unsigned char> >& pushes, vector<unsig
     for (int i = 0; i < pushCount; i++)
         pushes.pop_back();
     return true;
-}
-
-COutPoint CScript::GetWithdrawSpent() const
-{
-    try {
-        const_iterator pc = begin();
-        opcodetype opcode;
-
-        // We have to read the script from back-to-front, so we stack-ize it
-        vector<vector<unsigned char> > pushes;
-        pushes.reserve(6);
-        while (pc < end()) {
-            pushes.push_back(vector<unsigned char>());
-            assert(GetOp(pc, opcode, pushes.back()));
-            if (opcode <= OP_16 && opcode >= OP_1)
-                pushes.back().push_back(opcode - OP_1 + 1);
-            else if (opcode == OP_1NEGATE)
-                pushes.back().push_back(0x81);
-        }
-
-        int ntxOut = CScriptNum(pushes.back(), false).getint();
-        pushes.pop_back();
-
-        vector<unsigned char> vTx;
-        if (!PopWithdrawPush(pushes, &vTx))
-            return COutPoint();
-        Sidechain::Bitcoin::CTransactionRef tx;
-        CDataStream(vTx, SER_NETWORK, PROTOCOL_VERSION) >> tx;
-
-        if (ntxOut < 0 || (unsigned int)ntxOut >= tx->vout.size())
-            return COutPoint();
-
-        return COutPoint(tx->GetHash(), ntxOut);
-    } catch (std::exception& e) {
-        return COutPoint();
-    }
 }
 
 bool CScript::IsPayToScriptHash() const
