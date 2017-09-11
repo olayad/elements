@@ -638,9 +638,6 @@ public:
     bool IsWitnessProgram(int& version, std::vector<unsigned char>& program) const;
 
     // TODO-PEGIN delete all this
-    //! Push a vector with a length postfix (as used by withdraw proofs)
-    void PushWithdraw(const std::vector<unsigned char> push);
-
     COutPoint GetWithdrawSpent() const;
 
     uint256 GetWithdrawLockGenesisHash() const;

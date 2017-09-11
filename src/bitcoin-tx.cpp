@@ -758,8 +758,7 @@ static void MutateTxPeginSign(CMutableTransaction& tx, const std::string& flagSt
 
     CScript scriptSig;
     scriptSig << contractData;
-    scriptSig.PushWithdraw(txoutproofData);
-    scriptSig.PushWithdraw(txData);
+    // TODO-PEGIN fix peg-in functionality
     scriptSig << nOut;
 
     //TODO: Verify the withdraw proof
