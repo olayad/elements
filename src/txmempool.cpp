@@ -753,6 +753,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
         // just a sanity check, not definitive that this calc is correct...
         assert(it->GetSizeWithDescendants() >= childSizes + it->GetTxSize());
 
+        // TODO-PEGIN sort out mempool/block db pegin tracking
         if (fDependsWait)
             waitingOnDependants.push_back(&(*it));
         else {
