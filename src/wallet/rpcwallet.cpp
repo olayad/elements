@@ -3400,7 +3400,8 @@ CScriptID calculate_contract(const CScript& federationRedeemScript, const CScrip
     }
     txnouttype type;
     std::vector<std::vector<unsigned char> > solutions;
-    if (!Solver(federationRedeemScript, type, solutions) || (type != TX_WITNESS_V0_SCRIPTHASH && type != TX_WITNESS_V0_KEYHASH && type != TX_TRUE)) {
+    // Sanity check fedRedeemScript
+    if (!Solver(federationRedeemScript, type, solutions) || (type != TX_MULTISIG && type != TX_TRUE)) {
        assert(false);
     }
 

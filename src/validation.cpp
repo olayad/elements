@@ -2413,6 +2413,45 @@ bool IsValidPeginWitness(CScriptWitness& pegin_witness) {
     }
 
     // Check that the witness program matches the p2ch on the transaction output
+    opcodetype opcodeTmp;
+    unsigned char tweak[32];
+    CSHA256().Write(witness_program.data(), witness_program.size()).Finalize(tweak);
+    CScript fedpegscript = Params().GetConsensus().fedpegScript;
+    // fedpegscript should be multisig or OP_TRUE
+    txnouttype type;
+    std::vector<std::vector<unsigned char> > solutions;
+    if (!Solver(fedpegscript, type, solutions) || (type != TX_MULTISIG && type != TX_TRUE)) {
+        assert(false);
+    }
+    {
+        CScript::iterator sdpc = fedpegscript.begin();
+        std::vector<unsigned char> vch;
+        while (fedpegscript.GetOp(sdpc, opcodeTmp, vch))
+        {
+            if (vch.size() == 33)
+            {
+                size_t pub_len = 33;
+                int ret;
+                unsigned char *pub_start = &(*(sdpc - pub_len));
+                secp256k1_pubkey pubkey;
+                ret = secp256k1_ec_pubkey_parse(secp256k1_ctx_verify_amounts, &pubkey, pub_start, pub_len);
+                assert(ret == 1);
+                // If someone creates a tweak that makes this fail, they broke SHA256
+                ret = secp256k1_ec_pubkey_tweak_add(secp256k1_ctx_verify_amounts, &pubkey, tweak);
+                assert(ret == 1);
+                ret = secp256k1_ec_pubkey_serialize(secp256k1_ctx_verify_amounts, pub_start, &pub_len, &pubkey, SECP256K1_EC_COMPRESSED);
+                assert(ret == 1);
+                assert(pub_len == 33);
+            }
+        }
+    }
+
+    // Check against expected p2sh output
+    CScriptID expectedP2SH(fedpegscript);
+    CScript expected_script(CScript() << OP_HASH160 << ToByteVector(expectedP2SH) << OP_EQUAL);
+    if (pegtx->vout[nOut].scriptPubKey != expected_script) {
+        return false;
+    }
 
     // Finally, validate peg-in via rpc call
     if (GetBoolArg("-validatepegin", DEFAULT_VALIDATE_PEGIN)) {
