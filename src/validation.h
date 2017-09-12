@@ -377,7 +377,7 @@ int64_t GetTransactionSigOpCost(const CTransaction& tx, const CCoinsViewCache& i
  * instead of being performed inline.
  */
 bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsViewCache &view, bool fScriptChecks,
-                 unsigned int flags, bool cacheStore, PrecomputedTransactionData& txdata, std::set<std::pair<uint256, COutPoint> >& setWithdrawsSpent,
+                 unsigned int flags, bool cacheStore, PrecomputedTransactionData& txdata, std::set<std::pair<uint256, COutPoint> >& setPeginsSpent,
                  std::vector<CCheck*> *pvChecks = NULL);
 
 /** Apply the effects of this transaction on the UTXO set represented by view */
@@ -395,7 +395,7 @@ namespace Consensus {
  * This does not modify the UTXO set. This does not check scripts and sigs.
  * Preconditions: tx.IsCoinBase() is false.
  */
-bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, std::set<std::pair<uint256, COutPoint> >& setWithdrawsSpent, std::vector<CCheck*> *pvChecks, const bool cacheStore);
+bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, std::set<std::pair<uint256, COutPoint> >& setPeginsSpent, std::vector<CCheck*> *pvChecks, const bool cacheStore);
 
 } // namespace Consensus
 
@@ -522,7 +522,7 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, const Co
  *  Validity checks that depend on the UTXO set are also done; ConnectBlock()
  *  can fail if those validity checks fail (among other reasons). */
 bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex, CCoinsViewCache& coins,
-                  const CChainParams& chainparams, std::set<std::pair<uint256, COutPoint> >* setWithdrawsSpent = NULL, bool fJustCheck = false);
+                  const CChainParams& chainparams, std::set<std::pair<uint256, COutPoint> >* setPeginsSpent = NULL, bool fJustCheck = false);
 
 /** Undo the effects of this block (with given index) on the UTXO set represented by coins.
  *  In case pfClean is provided, operation will try to be tolerant about errors, and *pfClean
