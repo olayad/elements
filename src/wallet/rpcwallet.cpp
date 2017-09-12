@@ -3559,6 +3559,7 @@ UniValue sendtomainchain(const JSONRPCRequest& request)
     return wtxNew.GetHash().GetHex();
 }
 
+extern UniValue signrawtransaction(const JSONRPCRequest& request);
 extern UniValue sendrawtransaction(const JSONRPCRequest& request);
 
 unsigned int GetPeginTxnOutputIndex(const Sidechain::Bitcoin::CTransaction& txn, const CScript& witnessProgram)
@@ -3592,6 +3593,8 @@ UniValue claimpegin(const JSONRPCRequest& request)
             + HelpExampleRpc("claimpegin", "\"0200000002b80a99d63ca943d72141750d983a3eeda3a5c5a92aa962884ffb141eb49ffb4f000000006a473044022031ffe1d76decdfbbdb7e2ee6010e865a5134137c261e1921da0348b95a207f9e02203596b065c197e31bcc2f80575154774ac4e80acd7d812c91d93c4ca6a3636f27012102d2130dfbbae9bd27eee126182a39878ac4e117d0850f04db0326981f43447f9efeffffffb80a99d63ca943d72141750d983a3eeda3a5c5a92aa962884ffb141eb49ffb4f010000006b483045022100cf041ce0eb249ae5a6bc33c71c156549c7e5ad877ae39e2e3b9c8f1d81ed35060220472d4e4bcc3b7c8d1b34e467f46d80480959183d743dad73b1ed0e93ec9fd14f012103e73e8b55478ab9c5de22e2a9e73c3e6aca2c2e93cd2bad5dc4436a9a455a5c44feffffff0200e1f5050000000017a914da1745e9b549bd0bfa1a569971c77eba30cd5a4b87e86cbe00000000001976a914a25fe72e7139fd3f61936b228d657b2548b3936a88acc0020000\", \"00000020976e918ed537b0f99028648f2a25c0bd4513644fb84d9cbe1108b4df6b8edf6ba715c424110f0934265bf8c5763d9cc9f1675a0f728b35b9bc5875f6806be3d19cd5b159ffff7f2000000000020000000224eab3da09d99407cb79f0089e3257414c4121cb85a320e1fd0f88678b6b798e0713a8d66544b6f631f9b6d281c71633fb91a67619b189a06bab09794d5554a60105\", \"0014058c769ffc7d12c35cddec87384506f536383f9c\"")
         );
 
+    LOCK2(cs_main, pwalletMain->cs_wallet);
+
     if (IsInitialBlockDownload()) {
         throw JSONRPCError(RPC_WALLET_ERROR, "Peg-ins cannot be completed during initial sync or reindexing.");
     }
@@ -3624,20 +3627,21 @@ UniValue claimpegin(const JSONRPCRequest& request)
     if (!ssTxOutProof.empty() || !CheckBitcoinProof(merkleBlock.header.GetHash(), merkleBlock.header.nBits))
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx out proof");
 
-    vector<uint256> txHashes;
-    vector<unsigned int> txIndices;
+    std::vector<uint256> txHashes;
+    std::vector<unsigned int> txIndices;
     if (merkleBlock.txn.ExtractMatches(txHashes, txIndices) != merkleBlock.header.hashMerkleRoot)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid tx out proof");
 
     if (txHashes.size() != 1 || txHashes[0] != txBTC.GetHash())
         throw JSONRPCError(RPC_INVALID_PARAMETER, "The txoutproof must contain bitcoinTx and only bitcoinTx");
 
+    CScript witnessProgScript;
     unsigned int nOut = txBTC.vout.size();
     if (request.params.size() > 2) {
         int version = -1;
         std::vector<unsigned char> witnessProgram;
         std::vector<unsigned char> witnessBytes(ParseHex(request.params[2].get_str()));
-        CScript witnessProgScript(witnessBytes.begin(), witnessBytes.end());
+        CScript witnessProgScript = CScript(witnessBytes.begin(), witnessBytes.end());
         if (!witnessProgScript.IsWitnessProgram(version, witnessProgram) || version != 0) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Given witness_program is not a valid v0 witness program.");
         }
@@ -3656,22 +3660,76 @@ UniValue claimpegin(const JSONRPCRequest& request)
             }
             nOut = GetPeginTxnOutputIndex(txBTC, witnessProgramScript);
             if (nOut != txBTC.vout.size()) {
+                witnessProgScript = witnessProgramScript;
                 break;
             }
         }
     }
-    if (nOut == txBTC.vout.size())
+    if (nOut == txBTC.vout.size()) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Failed to find output in bitcoinTx to the mainchain_address from getpeginaddress");
+    }
+    assert(witnessProgScript != CScript());
+
     CAmount value = txBTC.vout[nOut].nValue;
 
     uint256 genesisBlockHash = Params().ParentGenesisBlockHash();
 
-    // TODO-PEGIN finish claimpegin
     // Manually construct peg-in transaction, sign it, and send it off.
     // Decrement the output value as much as needed given the total vsize to
     // pay the fees.
 
-    return NullUniValue;
+    if (!pwalletMain->IsLocked())
+        pwalletMain->TopUpKeyPool();
+
+    // Generate a new key that is added to wallet
+    CPubKey newKey;
+    if (!pwalletMain->GetKeyFromPool(newKey))
+        throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
+    CKeyID keyID = newKey.GetID();
+
+    pwalletMain->SetAddressBook(keyID, "", "receive");
+
+    // One peg-in input, one wallet output and one fee output
+    CMutableTransaction mtx;
+    mtx.vin.push_back(CTxIn(COutPoint(txHashes[0], nOut), CScript(), ~(uint32_t)0));
+    // mark as peg-in input
+    mtx.vin[0].m_is_pegin = true;
+    mtx.vout.push_back(CTxOut(Params().GetConsensus().pegged_asset, value, GetScriptForDestination(CBitcoinAddress(keyID).Get())));
+    mtx.vout.push_back(CTxOut(Params().GetConsensus().pegged_asset, 0, CScript()));
+
+    // Construct pegin proof
+    CScriptWitness pegin_witness;
+    std::vector<std::vector<unsigned char> >& stack = pegin_witness.stack;
+    stack.push_back(std::vector<unsigned char>(txHashes[0].begin(), txHashes[0].end()));
+    stack.push_back(CScriptNum::serialize(nOut));
+    stack.push_back(CScriptNum::serialize(value));
+    stack.push_back(std::vector<unsigned char>(Params().GetConsensus().pegged_asset.begin(), Params().GetConsensus().pegged_asset.end()));
+    stack.push_back(std::vector<unsigned char>(genesisBlockHash.begin(), genesisBlockHash.end()));
+    stack.push_back(std::vector<unsigned char>(witnessProgScript.begin(), witnessProgScript.end()));
+    stack.push_back(txData);
+    stack.push_back(txOutProofData);
+
+    // Put input witness in transaction
+    CTxInWitness txinwit;
+    txinwit.pegin_witness = pegin_witness;
+    mtx.wit.vtxinwit.push_back(txinwit);
+
+    // Estimate fee for transaction, decrement fee output(including estimated signature)
+    unsigned int nBytes = GetVirtualTransactionSize(mtx)+(72/WITNESS_SCALE_FACTOR);
+    CAmount nFeeNeeded = CWallet::GetMinimumFee(nBytes, nTxConfirmTarget, mempool);
+
+    mtx.vout[0].nValue = mtx.vout[0].nValue.GetAmount() - nFeeNeeded;
+    mtx.vout[1].nValue = mtx.vout[1].nValue.GetAmount() + nFeeNeeded;
+
+    // Sign and send
+    std::string strHex = EncodeHexTx(mtx, RPCSerializationFlags());
+    JSONRPCRequest request2;
+    request2.params.push_back(strHex);
+    UniValue result = signrawtransaction(request2);
+
+    JSONRPCRequest request3;
+    request3.params.push_back(result["hex"]);
+    return sendrawtransaction(request3);
 }
 
 UniValue issueasset(const JSONRPCRequest& request)

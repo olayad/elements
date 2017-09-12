@@ -2319,8 +2319,8 @@ bool BitcoindRPCCheck(const bool init)
 bool IsValidPeginWitness(const CScriptWitness& pegin_witness) {
 
     // Format on stack is as follows:
-    // 1) txid - txid of parent chain transaction
-    // 2) nout - output number that is a peg-in output
+    // 1) txid - txid of parent chain transaction - TODO-PEGIN unneeded?
+    // 2) nout - output number that is a peg-in output - unneeded?
     // 3) value - the value of the pegin output
     // 4) asset type - the asset type being pegged in
     // 5) genesis blockhash - genesis block of the parent chain
