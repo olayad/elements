@@ -3663,7 +3663,6 @@ UniValue claimpegin(const JSONRPCRequest& request)
                 witnessProgScript = witnessProgramScript;
                 break;
             }
-            // TODO-PEGIN looks like wrong one is being found on its own?
         }
     }
     if (nOut == txBTC.vout.size()) {
