@@ -3740,8 +3740,7 @@ UniValue claimpegin(const JSONRPCRequest& request)
     varr = UniValue(UniValue::VARR);
     varr.push_back(result["hex"]);
     request3.params = varr;
-    //return sendrawtransaction(request3);
-    return result["hex"];
+    return sendrawtransaction(request3);
 }
 
 UniValue issueasset(const JSONRPCRequest& request)
