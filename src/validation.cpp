@@ -307,6 +307,11 @@ static std::pair<int, int64_t> CalculateSequenceLocks(const CTransaction &tx, in
     for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++) {
         const CTxIn& txin = tx.vin[txinIndex];
 
+        // Peg-ins have no output height
+        if (txin.m_is_pegin) {
+            continue;
+        }
+
         // Sequence numbers with the most significant bit set are not
         // treated as relative lock-times, nor are they given any
         // consensus-enforced meaning at this point.
@@ -404,6 +409,11 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints* lp, bool 
         prevheights.resize(tx.vin.size());
         for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++) {
             const CTxIn& txin = tx.vin[txinIndex];
+            // pegins should not restrict validity of sequence locks
+            if (txin.m_is_pegin) {
+                prevheights[txinIndex] = -1;
+                continue;
+            }
             CCoins coins;
             if (!viewMemPool.GetCoins(txin.prevout.hash, coins)) {
                 return error("%s: Missing input", __func__);
@@ -468,6 +478,10 @@ unsigned int GetP2SHSigOpCount(const CTransaction& tx, const CCoinsViewCache& in
     unsigned int nSigOps = 0;
     for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
+        // Peg-in inputs are segwit-only
+        if (tx.vin[i].m_is_pegin) {
+            continue;
+        }
         const CTxOut &prevout = inputs.GetOutputFor(tx.vin[i]);
         if (prevout.scriptPubKey.IsPayToScriptHash())
             nSigOps += prevout.scriptPubKey.GetSigOpCount(tx.vin[i].scriptSig);
@@ -488,7 +502,11 @@ int64_t GetTransactionSigOpCost(const CTransaction& tx, const CCoinsViewCache& i
 
     for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
-        const CTxOut &prevout = inputs.GetOutputFor(tx.vin[i]);
+        if (tx.vin[i].m_is_pegin && tx.wit.vtxinwit.size() <= i) {
+            // Shouldn't happen. TODO disallows mismatched witness/vector sizes
+            continue;
+        }
+        const CTxOut &prevout = tx.vin[i].m_is_pegin ? GetPeginOutputFromWitness(tx.wit.vtxinwit[i].pegin_witness) : inputs.GetOutputFor(tx.vin[i]);
         nSigOps += CountWitnessSigOps(tx.vin[i].scriptSig, prevout.scriptPubKey, tx.wit.vtxinwit.size() > i ? &tx.wit.vtxinwit[i].scriptWitness : NULL, flags);
     }
     return nSigOps;
@@ -1215,14 +1233,18 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState& state, const C
         double nPriorityDummy = 0;
         pool.ApplyDeltas(hash, nPriorityDummy, nModifiedFees);
 
-        CAmount inChainInputValue;
-        double dPriority = view.GetPriority(tx, chainActive.Height(), inChainInputValue);
+        // Neuter priority in mempool
+        CAmount inChainInputValue = 0;
+        double dPriority = 0;
 
         // Keep track of transactions that spend a coinbase, which we re-scan
         // during reorgs to ensure COINBASE_MATURITY is still met.
         // Also track withdraw lock spends to allow them through free relay
         bool fSpendsCoinbase = false;
         BOOST_FOREACH(const CTxIn &txin, tx.vin) {
+            if (txin.m_is_pegin) {
+                continue;
+            }
             const CCoins *coins = view.AccessCoins(txin.prevout.hash);
             if (coins->IsCoinBase()) {
                 fSpendsCoinbase = true;
@@ -1814,7 +1836,7 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo &txund
         for (unsigned int i = 0; i < tx.vin.size(); i++) {
             const CTxIn &txin = tx.vin[i];
             if (txin.m_is_pegin) {
-                    std::pair<uint256, COutPoint> outpoint;
+                    std::pair<uint256, COutPoint> outpoint = std::make_pair(uint256(tx.wit.vtxinwit[i].pegin_witness.stack[4]), txin.prevout);
                     inputs.SetWithdrawSpent(outpoint, true);
                     // Dummy undo
                     txundo.vprevout.push_back(CTxInUndo());
@@ -2106,7 +2128,7 @@ bool ApplyTxInUndo(const CTxInUndo& undo, CCoinsViewCache& view, const COutPoint
         if (!IsValidPeginWitness(pegin_witness)) {
             fClean = fClean && error("%s: peg-in occurred without proof", __func__);
         } else {
-            std::pair<uint256, COutPoint> outpoint = std::make_pair(uint256(pegin_witness.stack[4]), txin.prevout);;
+            std::pair<uint256, COutPoint> outpoint = std::make_pair(uint256(pegin_witness.stack[4]), txin.prevout);
             bool fSpent = view.IsWithdrawSpent(outpoint);
             if (!fSpent) {
                 fClean = fClean && error("%s: peg-in bitcoin txid not marked spent", __func__);
@@ -2363,7 +2385,12 @@ bool IsValidPeginWitness(const CScriptWitness& pegin_witness) {
     uint256 gen_hash(stack[4]);
 
     // Get witness program
-    CScript witness_program(stack[5]);
+    CScript witness_program(stack[5].begin(), stack[5].end());
+    int version = -1;
+    std::vector<unsigned char> witnessProgram;
+    if (!witness_program.IsWitnessProgram(version, witnessProgram)) {
+        return false;
+    }
 
     // Get serialized transaction
     Sidechain::Bitcoin::CTransactionRef pegtx;
@@ -2477,7 +2504,7 @@ CTxOut GetPeginOutputFromWitness(const CScriptWitness& pegin_witness) {
     assert(IsValidPeginWitness(pegin_witness));
     // TODO-PEGIN debugging
     std::string witstr = HexStr(pegin_witness.stack[5]);
-    return CTxOut(CAsset(pegin_witness.stack[3]), CScriptNum(pegin_witness.stack[2], true).getint(), CScript(pegin_witness.stack[5]));
+    return CTxOut(CAsset(pegin_witness.stack[3]), CScriptNum(pegin_witness.stack[2], true).getint(), CScript(pegin_witness.stack[5].begin(), pegin_witness.stack[5].end()));
 }
 
 // Protected by cs_main
@@ -2686,7 +2713,11 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             // be in ConnectBlock because they require the UTXO set
             prevheights.resize(tx.vin.size());
             for (size_t j = 0; j < tx.vin.size(); j++) {
-                prevheights[j] = view.AccessCoins(tx.vin[j].prevout.hash)->nHeight;
+                if (tx.vin[j].m_is_pegin) {
+                    prevheights[j] = -1;
+                } else {
+                    prevheights[j] = view.AccessCoins(tx.vin[j].prevout.hash)->nHeight;
+                }
             }
 
             if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex)) {

@@ -3663,12 +3663,19 @@ UniValue claimpegin(const JSONRPCRequest& request)
                 witnessProgScript = witnessProgramScript;
                 break;
             }
+            // TODO-PEGIN looks like wrong one is being found on its own?
         }
     }
     if (nOut == txBTC.vout.size()) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Failed to find output in bitcoinTx to the mainchain_address from getpeginaddress");
     }
     assert(witnessProgScript != CScript());
+
+    int version = -1;
+    std::vector<unsigned char> witnessProgram;
+    if (!witnessProgScript.IsWitnessProgram(version, witnessProgram)) {
+        return false;
+    }
 
     CAmount value = txBTC.vout[nOut].nValue;
 
@@ -3733,7 +3740,8 @@ UniValue claimpegin(const JSONRPCRequest& request)
     varr = UniValue(UniValue::VARR);
     varr.push_back(result["hex"]);
     request3.params = varr;
-    return sendrawtransaction(request3);
+    //return sendrawtransaction(request3);
+    return result["hex"];
 }
 
 UniValue issueasset(const JSONRPCRequest& request)
