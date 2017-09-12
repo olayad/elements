@@ -502,8 +502,7 @@ int64_t GetTransactionSigOpCost(const CTransaction& tx, const CCoinsViewCache& i
 
     for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
-        if (tx.vin[i].m_is_pegin && tx.wit.vtxinwit.size() <= i) {
-            // Shouldn't happen. TODO disallows mismatched witness/vector sizes
+        if (tx.vin[i].m_is_pegin && (tx.wit.vtxinwit.size() <= i || !IsValidPeginWitness(tx.wit.vtxinwit[i].pegin_witness))) {
             continue;
         }
         const CTxOut &prevout = tx.vin[i].m_is_pegin ? GetPeginOutputFromWitness(tx.wit.vtxinwit[i].pegin_witness) : inputs.GetOutputFor(tx.vin[i]);
@@ -1901,7 +1900,7 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
             if (tx.vin[i].m_is_pegin) {
                 // Check existence and validity of pegin witness
                 if (tx.wit.vtxinwit.size() <= i || !IsValidPeginWitness(tx.wit.vtxinwit[i].pegin_witness)) {
-                    return false;
+                    return state.DoS(0, false, REJECT_INVALID, "bad-pegin-witness", true);
                 }
                 std::pair<uint256, COutPoint> pegin = std::make_pair(uint256(tx.wit.vtxinwit[i].pegin_witness.stack[4]), prevout);
                 if (inputs.IsWithdrawSpent(pegin)) {
@@ -2492,7 +2491,7 @@ bool IsValidPeginWitness(const CScriptWitness& pegin_witness) {
 
     // Finally, validate peg-in via rpc call
     if (GetBoolArg("-validatepegin", DEFAULT_VALIDATE_PEGIN)) {
-        uint256 hash;
+        // TODO-PEGIN return useful error message
         return IsConfirmedBitcoinBlock(Params().ParentGenesisBlockHash(), merkle_block.header.GetHash(), GetArg("-peginconfirmationdepth", DEFAULT_PEGIN_CONFIRMATION_DEPTH));
     }
     return true;
@@ -2503,7 +2502,6 @@ CTxOut GetPeginOutputFromWitness(const CScriptWitness& pegin_witness) {
     // Must check validity first for formatting reasons
     assert(IsValidPeginWitness(pegin_witness));
     // TODO-PEGIN debugging
-    std::string witstr = HexStr(pegin_witness.stack[5]);
     return CTxOut(CAsset(pegin_witness.stack[3]), CScriptNum(pegin_witness.stack[2], true).getint(), CScript(pegin_witness.stack[5].begin(), pegin_witness.stack[5].end()));
 }
 
