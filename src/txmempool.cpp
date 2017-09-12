@@ -450,7 +450,7 @@ bool CTxMemPool::addUnchecked(const uint256& hash, const CTxMemPoolEntry &entry,
 
     typedef std::pair<uint256, COutPoint> PeginPair;
     BOOST_FOREACH(const PeginPair& it, entry.setPeginsSpent) {
-        std::pair ret = mapWithdrawsSpentToTxid.insert(std::make_pair(it, hash));
+        std::pair<std::map<std::pair<uint256, COutPoint>, uint256>::iterator, bool> ret = mapWithdrawsSpentToTxid.insert(std::make_pair(it, hash));
         assert(ret.second);
     }
 
