@@ -2077,7 +2077,7 @@ bool AbortNode(CValidationState& state, const std::string& strMessage, const std
  * @param out The out point that corresponds to the tx input.
  * @return True on success.
  */
-bool ApplyTxInUndo(const CTxInUndo& undo, CCoinsViewCache& view, const COutPoint& out, const CTxIn& txin)
+bool ApplyTxInUndo(const CTxInUndo& undo, CCoinsViewCache& view, const COutPoint& out, const CTxIn& txin, const CScriptWitness& pegin_witness)
 {
     bool fClean = true;
 
@@ -2103,15 +2103,13 @@ bool ApplyTxInUndo(const CTxInUndo& undo, CCoinsViewCache& view, const COutPoint
             coins->vout.resize(out.n+1);
         coins->vout[out.n] = undo.txout;
     } else {
-        // TODO-PEGIN make this about witness data, validate logic
-        if (false) {//!txin.scriptSig.IsWithdrawProof()) {
-            // This seems wrong: if (!txin.scriptSig.IsPushOnly())
-            fClean = fClean && error("%s: lock spent by non-proof", __func__);
+        if (!IsValidPeginWitness(pegin_witness)) {
+            fClean = fClean && error("%s: peg-in occurred without proof", __func__);
         } else {
-            std::pair<uint256, COutPoint> outpoint;
+            std::pair<uint256, COutPoint> outpoint = std::make_pair(uint256(pegin_witness.stack[4]), txin.prevout);;
             bool fSpent = view.IsWithdrawSpent(outpoint);
             if (!fSpent) {
-                fClean = fClean && error("%s: withdraw not marked spent", __func__);
+                fClean = fClean && error("%s: peg-in bitcoin txid not marked spent", __func__);
             } else {
                 view.SetWithdrawSpent(outpoint, false);
             }
@@ -2172,8 +2170,8 @@ bool DisconnectBlock(const CBlock& block, CValidationState& state, const CBlockI
             for (unsigned int j = tx.vin.size(); j-- > 0;) {
                 const COutPoint &out = tx.vin[j].prevout;
                 const CTxInUndo &undo = txundo.vprevout[j];
-                // TODO-PEGIN make sure we handle pegin rewinds correctly
-                if (!ApplyTxInUndo(undo, view, out, tx.vin[j]))
+                const CScriptWitness &pegin_wit = tx.wit.vtxinwit.size() > j ? tx.wit.vtxinwit[j].pegin_witness : CScriptWitness();
+                if (!ApplyTxInUndo(undo, view, out, tx.vin[j], pegin_wit))
                     fClean = false;
             }
         }
