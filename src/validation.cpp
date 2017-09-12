@@ -2665,6 +2665,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     std::vector<PrecomputedTransactionData> txdata;
     txdata.reserve(block.vtx.size()); // Required so that pointers to individual PrecomputedTransactionData don't get invalidated
 
+    // Used when ConnectBlock() results are unneeded for mempool ejection
     std::set<std::pair<uint256, COutPoint> > setPeginsSpentDummy;
 
     for (unsigned int i = 0; i < block.vtx.size(); i++)
@@ -3069,6 +3070,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     int64_t nTime2 = GetTimeMicros(); nTimeReadFromDisk += nTime2 - nTime1;
     int64_t nTime3;
     LogPrint("bench", "  - Load block from disk: %.2fms [%.2fs]\n", (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
+    // For mempool removal with pegin conflicts
     std::set<std::pair<uint256, COutPoint> > setPeginsSpent;
     {
         CCoinsViewCache view(pcoinsTip);

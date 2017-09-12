@@ -448,9 +448,11 @@ bool CTxMemPool::addUnchecked(const uint256& hash, const CTxMemPoolEntry &entry,
     vTxHashes.emplace_back(tx.GetHashWithWitness(), newit);
     newit->vTxHashesIdx = vTxHashes.size() - 1;
 
-    typedef std::pair<uint256, COutPoint> WithdrawPair;
-    BOOST_FOREACH(const WithdrawPair& it, entry.setPeginsSpent)
-        assert(mapWithdrawsSpentToTxid.insert(std::make_pair(it, hash)).second);
+    typedef std::pair<uint256, COutPoint> PeginPair;
+    BOOST_FOREACH(const PeginPair& it, entry.setPeginsSpent) {
+        std::pair ret = mapWithdrawsSpentToTxid.insert(std::make_pair(it, hash));
+        assert(ret.second);
+    }
 
     return true;
 }
@@ -462,9 +464,10 @@ void CTxMemPool::removeUnchecked(txiter it, MemPoolRemovalReason reason)
     BOOST_FOREACH(const CTxIn& txin, it->GetTx().vin)
         mapNextTx.erase(txin.prevout);
 
-    typedef std::pair<uint256, COutPoint> WithdrawPair;
-    BOOST_FOREACH(const WithdrawPair& it2, it->setPeginsSpent)
-        assert(mapWithdrawsSpentToTxid.erase(it2));
+    typedef std::pair<uint256, COutPoint> PeginPair;
+    BOOST_FOREACH(const PeginPair& it2, it->setPeginsSpent) {
+        mapWithdrawsSpentToTxid.erase(it2);
+    }
 
     if (vTxHashes.size() > 1) {
         vTxHashes[it->vTxHashesIdx] = std::move(vTxHashes.back());
@@ -628,6 +631,7 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef>& vtx, unsigne
         removeConflicts(*tx);
         ClearPrioritisation(tx->GetHash());
     }
+    // Eject any conflicting pegins
     for (std::set<std::pair<uint256, COutPoint> >::const_iterator it = setPeginsSpent.begin(); it != setPeginsSpent.end(); it++) {
         std::map<std::pair<uint256, COutPoint>, uint256>::const_iterator it2 = mapWithdrawsSpentToTxid.find(*it);
         if (it2 != mapWithdrawsSpentToTxid.end()) {
