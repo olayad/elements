@@ -2334,7 +2334,7 @@ bool IsValidPeginWitness(const CScriptWitness& pegin_witness) {
 
     const std::vector<std::vector<unsigned char> >& stack = pegin_witness.stack;
     // Must include all elements
-    if (stack.size() != 7) {
+    if (stack.size() != 8) {
         return false;
     }
 
@@ -2475,7 +2475,8 @@ bool IsValidPeginWitness(const CScriptWitness& pegin_witness) {
 CTxOut GetPeginOutputFromWitness(const CScriptWitness& pegin_witness) {
     // Must check validity first for formatting reasons
     assert(IsValidPeginWitness(pegin_witness));
-
+    // TODO-PEGIN debugging
+    std::string witstr = HexStr(pegin_witness.stack[5]);
     return CTxOut(CAsset(pegin_witness.stack[3]), CScriptNum(pegin_witness.stack[2], true).getint(), CScript(pegin_witness.stack[5]));
 }
 

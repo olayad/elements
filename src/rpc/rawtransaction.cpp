@@ -1384,6 +1384,7 @@ UniValue signrawtransaction(const JSONRPCRequest& request)
             continue;
         } else if (txin.m_is_pegin && (txConst.wit.vtxinwit.size() <= i || !IsValidPeginWitness(txConst.wit.vtxinwit[i].pegin_witness))) {
             TxInErrorToJSON(txin, vErrors, "Peg-in input has invalid proof.");
+            continue;
         }
         const CScript& prevPubKey = txin.m_is_pegin ? GetPeginOutputFromWitness(txConst.wit.vtxinwit[i].pegin_witness).scriptPubKey : coins->vout[txin.prevout.n].scriptPubKey;
         const CConfidentialValue& amount = txin.m_is_pegin ? GetPeginOutputFromWitness(txConst.wit.vtxinwit[i].pegin_witness).nValue : coins->vout[txin.prevout.n].nValue;

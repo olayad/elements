@@ -3641,7 +3641,7 @@ UniValue claimpegin(const JSONRPCRequest& request)
         int version = -1;
         std::vector<unsigned char> witnessProgram;
         std::vector<unsigned char> witnessBytes(ParseHex(request.params[2].get_str()));
-        CScript witnessProgScript = CScript(witnessBytes.begin(), witnessBytes.end());
+        witnessProgScript = CScript(witnessBytes.begin(), witnessBytes.end());
         if (!witnessProgScript.IsWitnessProgram(version, witnessProgram) || version != 0) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Given witness_program is not a valid v0 witness program.");
         }
@@ -3724,11 +3724,15 @@ UniValue claimpegin(const JSONRPCRequest& request)
     // Sign and send
     std::string strHex = EncodeHexTx(mtx, RPCSerializationFlags());
     JSONRPCRequest request2;
-    request2.params.push_back(strHex);
+    UniValue varr(UniValue::VARR);
+    varr.push_back(strHex);
+    request2.params = varr;
     UniValue result = signrawtransaction(request2);
 
     JSONRPCRequest request3;
-    request3.params.push_back(result["hex"]);
+    varr = UniValue(UniValue::VARR);
+    varr.push_back(result["hex"]);
+    request3.params = varr;
     return sendrawtransaction(request3);
 }
 
