@@ -2568,9 +2568,12 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     uint256 hashPrevBlock = pindex->pprev == NULL ? uint256() : pindex->pprev->GetBlockHash();
     assert(hashPrevBlock == view.GetBestBlock());
 
-    // Gesesis coinbase has no spendable outputs.
+    // Add genesis outputs, if any from last transaction.
     if (block.GetHash() == chainparams.GetConsensus().hashGenesisBlock) {
         if (!fJustCheck) {
+            const CTransaction tx = *(block.vtx[block.vtx.size()-1]);
+            // Directly add new coins to DB
+            view.ModifyNewCoins(tx.GetHash(), tx.IsCoinBase())->FromTx(tx, pindex->nHeight);
             view.SetBestBlock(pindex->GetBlockHash());
         }
         return true;

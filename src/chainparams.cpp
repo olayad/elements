@@ -63,6 +63,41 @@ static CBlock CreateGenesisBlock(const Consensus::Params& params, const std::str
     return genesis;
 }
 
+/** Add a issuance transaction to the genesis block. Typically used to pre-issue
+ * the policyAsset of a blockchain. The genesis block is not actually validated,
+ * so this transaction simply has to match issuance structure. */
+static void AppendPolicyIssuance(CBlock& genesis_block, const COutPoint& prevout, const uint256& contract, const int64_t asset_outputs, const int64_t asset_values, const int64_t reissuance_outputs, const int64_t reissuance_values, const CScript& issuance_destination) {
+
+    uint256 entropy;
+    GenerateAssetEntropy(entropy, prevout, contract);
+
+    CAsset asset;
+    CalculateAsset(asset, entropy);
+
+    // Re-issuance of policyAsset is always unblinded
+    CAsset reissuance;
+    CalculateReissuanceToken(reissuance, entropy, false);
+
+    // Note: Genesis block isn't actually validated, outputs are entered into utxo db only
+    CMutableTransaction txNew;
+    txNew.nVersion = 1;
+    txNew.vin.resize(1);
+    txNew.vin[0].prevout = prevout;
+    txNew.vin[0].assetIssuance.assetEntropy = contract;
+    txNew.vin[0].assetIssuance.nAmount = asset_values*asset_outputs;
+    txNew.vin[0].assetIssuance.nInflationKeys = reissuance_values*reissuance_outputs;
+
+    for (unsigned int i = 0; i < asset_outputs; i++) {
+        txNew.vout.push_back(CTxOut(asset, asset_values, issuance_destination));
+    }
+    for (unsigned int i = 0; i < reissuance_outputs; i++) {
+        txNew.vout.push_back(CTxOut(reissuance, reissuance_values, issuance_destination));
+    }
+
+    genesis_block.vtx.push_back(MakeTransactionRef(std::move(txNew)));
+    genesis_block.hashMerkleRoot = BlockMerkleRoot(genesis_block);
+}
+
 void CChainParams::UpdateBIP9Parameters(Consensus::DeploymentPos d, int64_t nStartTime, int64_t nTimeout)
 {
     consensus.vDeployments[d].nStartTime = nStartTime;
@@ -255,6 +290,7 @@ public:
         CalculateAsset(consensus.pegged_asset, entropy);
 
         genesis = CreateGenesisBlock(consensus, strNetworkID, 1296688602, genesisChallengeScript, 1);
+        AppendPolicyIssuance(genesis, COutPoint(uint256(commit), 0), parentGenesisBlockHash, 1, 100000000, 1, 1, CScript() << OP_TRUE);
         consensus.hashGenesisBlock = genesis.GetHash();
 
 
