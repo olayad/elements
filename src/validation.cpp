@@ -2492,7 +2492,7 @@ bool IsValidPeginWitness(const CScriptWitness& pegin_witness) {
     // Finally, validate peg-in via rpc call
     if (GetBoolArg("-validatepegin", DEFAULT_VALIDATE_PEGIN)) {
         // TODO-PEGIN return useful error message
-        return IsConfirmedBitcoinBlock(Params().ParentGenesisBlockHash(), merkle_block.header.GetHash(), GetArg("-peginconfirmationdepth", DEFAULT_PEGIN_CONFIRMATION_DEPTH));
+        return IsConfirmedBitcoinBlock(merkle_block.header.GetHash(), GetArg("-peginconfirmationdepth", DEFAULT_PEGIN_CONFIRMATION_DEPTH));
     }
     return true;
 }
