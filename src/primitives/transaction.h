@@ -382,7 +382,7 @@ public:
     CAssetIssuance assetIssuance;
     /* If this is set to true, the input is interpreted as a
      * peg-in claim and processed as such */
-    bool m_is_pegin;
+    bool m_is_pegin = false;
 
     /* Setting nSequence to this value for every input in a transaction
      * disables nLockTime. */
