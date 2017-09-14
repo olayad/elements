@@ -2368,8 +2368,8 @@ bool IsValidPeginWitness(const CScriptWitness& pegin_witness) {
     // Get output number
     int nOut = CScriptNum(stack[1], true).getint();
 
-    // Get output value
-    CAmount value = CScriptNum(stack[2], true).getint();
+    // Get output value. Special 8 byte length to capture possible bitcoin values
+    CAmount value = CScriptNum(stack[2], true, 8).getint64();
 
     // Get asset type
     if (stack[3].size() != 32) {
@@ -2501,8 +2501,7 @@ bool IsValidPeginWitness(const CScriptWitness& pegin_witness) {
 CTxOut GetPeginOutputFromWitness(const CScriptWitness& pegin_witness) {
     // Must check validity first for formatting reasons
     assert(IsValidPeginWitness(pegin_witness));
-    // TODO-PEGIN debugging
-    return CTxOut(CAsset(pegin_witness.stack[3]), CScriptNum(pegin_witness.stack[2], true).getint(), CScript(pegin_witness.stack[5].begin(), pegin_witness.stack[5].end()));
+    return CTxOut(CAsset(pegin_witness.stack[3]), CScriptNum(pegin_witness.stack[2], true, 8).getint64(), CScript(pegin_witness.stack[5].begin(), pegin_witness.stack[5].end()));
 }
 
 // Protected by cs_main

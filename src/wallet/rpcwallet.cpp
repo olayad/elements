@@ -6,6 +6,7 @@
 #include "amount.h"
 #include "assetsdir.h"
 #include "base58.h"
+#include "callrpc.h"
 #include "chain.h"
 #include "consensus/validation.h"
 #include "core_io.h"
@@ -3673,7 +3674,12 @@ UniValue claimpegin(const JSONRPCRequest& request)
     int version = -1;
     std::vector<unsigned char> witnessProgram;
     if (!witnessProgScript.IsWitnessProgram(version, witnessProgram)) {
-        return false;
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Given or recovered script is not a witness program.");
+    }
+
+    // Additional block lee-way to avoid bitcoin block races
+    if (!IsConfirmedBitcoinBlock(merkleBlock.header.GetHash(), GetArg("-peginconfirmationdepth", DEFAULT_PEGIN_CONFIRMATION_DEPTH)+2)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Peg-in Bitcoin transaction needs more confirmations to be sent.");
     }
 
     CAmount value = txBTC.vout[nOut].nValue;
@@ -3714,6 +3720,10 @@ UniValue claimpegin(const JSONRPCRequest& request)
     stack.push_back(std::vector<unsigned char>(witnessProgScript.begin(), witnessProgScript.end()));
     stack.push_back(txData);
     stack.push_back(txOutProofData);
+
+    if (!IsValidPeginWitness(pegin_witness)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Constructed peg-in witness is invalid.");
+    }
 
     // Put input witness in transaction
     CTxInWitness txinwit;
