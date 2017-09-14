@@ -290,7 +290,7 @@ public:
         CalculateAsset(consensus.pegged_asset, entropy);
 
         genesis = CreateGenesisBlock(consensus, strNetworkID, 1296688602, genesisChallengeScript, 1);
-        AppendPolicyIssuance(genesis, COutPoint(uint256(commit), 0), parentGenesisBlockHash, 1, 100000000, 1, 1, CScript() << OP_TRUE);
+        AppendPolicyIssuance(genesis, COutPoint(uint256(commit), 0), parentGenesisBlockHash, 100, 21000000000000, 0, 0, CScript() << OP_TRUE);
         consensus.hashGenesisBlock = genesis.GetHash();
 
 
