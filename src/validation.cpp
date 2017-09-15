@@ -307,6 +307,11 @@ static std::pair<int, int64_t> CalculateSequenceLocks(const CTransaction &tx, in
     for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++) {
         const CTxIn& txin = tx.vin[txinIndex];
 
+        // Peg-ins have no output height
+        if (txin.m_is_pegin) {
+            continue;
+        }
+
         // Sequence numbers with the most significant bit set are not
         // treated as relative lock-times, nor are they given any
         // consensus-enforced meaning at this point.
@@ -404,6 +409,11 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints* lp, bool 
         prevheights.resize(tx.vin.size());
         for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++) {
             const CTxIn& txin = tx.vin[txinIndex];
+            // pegins should not restrict validity of sequence locks
+            if (txin.m_is_pegin) {
+                prevheights[txinIndex] = -1;
+                continue;
+            }
             CCoins coins;
             if (!viewMemPool.GetCoins(txin.prevout.hash, coins)) {
                 return error("%s: Missing input", __func__);
@@ -468,6 +478,10 @@ unsigned int GetP2SHSigOpCount(const CTransaction& tx, const CCoinsViewCache& in
     unsigned int nSigOps = 0;
     for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
+        // Peg-in inputs are segwit-only
+        if (tx.vin[i].m_is_pegin) {
+            continue;
+        }
         const CTxOut &prevout = inputs.GetOutputFor(tx.vin[i]);
         if (prevout.scriptPubKey.IsPayToScriptHash())
             nSigOps += prevout.scriptPubKey.GetSigOpCount(tx.vin[i].scriptSig);
@@ -488,7 +502,10 @@ int64_t GetTransactionSigOpCost(const CTransaction& tx, const CCoinsViewCache& i
 
     for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
-        const CTxOut &prevout = inputs.GetOutputFor(tx.vin[i]);
+        if (tx.vin[i].m_is_pegin && (tx.wit.vtxinwit.size() <= i || !IsValidPeginWitness(tx.wit.vtxinwit[i].pegin_witness))) {
+            continue;
+        }
+        const CTxOut &prevout = tx.vin[i].m_is_pegin ? GetPeginOutputFromWitness(tx.wit.vtxinwit[i].pegin_witness) : inputs.GetOutputFor(tx.vin[i]);
         nSigOps += CountWitnessSigOps(tx.vin[i].scriptSig, prevout.scriptPubKey, tx.wit.vtxinwit.size() > i ? &tx.wit.vtxinwit[i].scriptWitness : NULL, flags);
     }
     return nSigOps;
@@ -707,180 +724,176 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
     targetGenerators.reserve(tx.vin.size() + GetNumIssuances(tx));
 
     // Tally up value commitments, check balance
-    if (!tx.IsCoinBase())
+    for (size_t i = 0; i < tx.vin.size(); ++i)
     {
+        // Assumes IsValidPeginWitness has been called successfully
+        const CTxOut out = tx.vin[i].m_is_pegin ? GetPeginOutputFromWitness(tx.wit.vtxinwit[i].pegin_witness) : cache.GetOutputFor(tx.vin[i]);
+        const CConfidentialValue& val = out.nValue;
+        const CConfidentialAsset& asset = out.nAsset;
 
-        for (size_t i = 0; i < tx.vin.size(); ++i)
-        {
+        if (val.IsNull() || asset.IsNull())
+            return false;
 
-            const CTxOut out = cache.GetOutputFor(tx.vin[i]);
-            const CConfidentialValue& val = out.nValue;
-            const CConfidentialAsset& asset = out.nAsset;
+        if (asset.IsExplicit()) {
+            ret = secp256k1_generator_generate(secp256k1_ctx_verify_amounts, &gen, asset.GetAsset().begin());
+            assert(ret != 0);
+        }
+        else if (asset.IsCommitment()) {
+            if (secp256k1_generator_parse(secp256k1_ctx_verify_amounts, &gen, &asset.vchCommitment[0]) != 1)
+                return false;
+        }
+        else {
+            return false;
+        }
 
-            if (val.IsNull() || asset.IsNull())
+        targetGenerators.push_back(gen);
+
+        if (val.IsExplicit()) {
+            if (!MoneyRange(val.GetAmount()))
                 return false;
 
-            if (asset.IsExplicit()) {
-                ret = secp256k1_generator_generate(secp256k1_ctx_verify_amounts, &gen, asset.GetAsset().begin());
-                assert(ret != 0);
-            }
-            else if (asset.IsCommitment()) {
-                if (secp256k1_generator_parse(secp256k1_ctx_verify_amounts, &gen, &asset.vchCommitment[0]) != 1)
-                    return false;
-            }
-            else {
-                return false;
-            }
+            assert(val.GetAmount() != 0);
 
+            if (secp256k1_pedersen_commit(secp256k1_ctx_verify_amounts, &commit, explBlinds, val.GetAmount(), &gen) != 1)
+                return false;
+        }
+        else {
+            assert(val.IsCommitment());
+            if (secp256k1_pedersen_commitment_parse(secp256k1_ctx_verify_amounts, &commit, &val.vchCommitment[0]) != 1)
+                return false;
+        }
+
+        vData.push_back(commit);
+        vpCommitsIn.push_back(p);
+        p++;
+
+        // Each transaction input may have up to two "pseudo-inputs" to add to the LHS
+        // for (re)issuance and may require up to two rangeproof checks:
+        // blinded value of the new assets being made
+        // blinded value of the issuance tokens being made (only for initial issuance)
+        const CAssetIssuance& issuance = tx.vin[i].assetIssuance;
+
+        // No issuances to process, continue to next input
+        if (issuance.IsNull()) {
+            continue;
+        }
+
+        CAsset assetID;
+        CAsset assetTokenID;
+
+        // First construct the assets of the issuances and reissuance token
+        // These are calculated differently depending on if initial issuance or followup
+
+        // New issuance, compute the asset ids
+        if (issuance.assetBlindingNonce.IsNull()) {
+            uint256 entropy;
+            GenerateAssetEntropy(entropy, tx.vin[i].prevout, issuance.assetEntropy);
+            CalculateAsset(assetID, entropy);
+            // Null nAmount is considered explicit 0, so just check for commitment
+            CalculateReissuanceToken(assetTokenID, entropy, issuance.nAmount.IsCommitment());
+        } else {
+            //Re-issuance
+
+            // hashAssetIdentifier doubles as the entropy on reissuance
+            CalculateAsset(assetID, issuance.assetEntropy);
+            CalculateReissuanceToken(assetTokenID, issuance.assetEntropy, issuance.nAmount.IsCommitment());
+
+            // Must check that prevout is the blinded issuance token
+            // prevout's asset tag = assetTokenID + assetBlindingNonce
+
+            if (secp256k1_generator_generate_blinded(secp256k1_ctx_verify_amounts, &gen, assetTokenID.begin(), issuance.assetBlindingNonce.begin()) != 1)
+                return false;
+            if (secp256k1_generator_parse(secp256k1_ctx_verify_amounts, &gencmp, &asset.vchCommitment[0]) != 1)
+                return false;
+            if (memcmp(&gen, &gencmp, 33))
+                return false;
+        }
+
+        // Process issuance of asset
+        if (!issuance.nAmount.IsNull()) {
+
+            // Generate asset generator and add to list of surjection targets
+            ret = secp256k1_generator_generate(secp256k1_ctx_verify_amounts, &gen, assetID.begin());
+            assert(ret == 1);
+            CConfidentialAsset issuanceAsset;
+            issuanceAsset.vchCommitment.resize(CConfidentialAsset::nCommittedSize);
+            secp256k1_generator_serialize(secp256k1_ctx_verify_amounts, &issuanceAsset.vchCommitment[0], &gen);
             targetGenerators.push_back(gen);
 
-            if (val.IsExplicit()) {
-                if (!MoneyRange(val.GetAmount()))
+            // Build value commitment and add to tally
+            if (issuance.nAmount.IsExplicit()) {
+                if (!MoneyRange(issuance.nAmount.GetAmount())) {
                     return false;
+                }
 
-                assert(val.GetAmount() != 0);
+                if (issuance.nAmount.GetAmount() == 0) {
+                    continue;
+                }
 
-                if (secp256k1_pedersen_commit(secp256k1_ctx_verify_amounts, &commit, explBlinds, val.GetAmount(), &gen) != 1)
+                if (secp256k1_pedersen_commit(secp256k1_ctx_verify_amounts, &commit, explBlinds, issuance.nAmount.GetAmount(), &gen) != 1) {
                     return false;
+                }
             }
-            else {
-                assert(val.IsCommitment());
-                if (secp256k1_pedersen_commitment_parse(secp256k1_ctx_verify_amounts, &commit, &val.vchCommitment[0]) != 1)
+            else if (issuance.nAmount.IsCommitment()) {
+                if (secp256k1_pedersen_commitment_parse(secp256k1_ctx_verify_amounts, &commit, &issuance.nAmount.vchCommitment[0]) != 1) {
                     return false;
+                }
+            } else {
+                return false;
             }
 
             vData.push_back(commit);
             vpCommitsIn.push_back(p);
             p++;
 
-            // Each transaction input may have up to two "pseudo-inputs" to add to the LHS
-            // for (re)issuance and may require up to two rangeproof checks:
-            // blinded value of the new assets being made
-            // blinded value of the issuance tokens being made (only for initial issuance)
-            const CAssetIssuance& issuance = tx.vin[i].assetIssuance;
-
-            // No issuances to process, continue to next input
-            if (issuance.IsNull()) {
-                continue;
-            }
-
-            CAsset assetID;
-            CAsset assetTokenID;
-
-            // First construct the assets of the issuances and reissuance token
-            // These are calculated differently depending on if initial issuance or followup
-
-            // New issuance, compute the asset ids
-            if (issuance.assetBlindingNonce.IsNull()) {
-                uint256 entropy;
-                GenerateAssetEntropy(entropy, tx.vin[i].prevout, issuance.assetEntropy);
-                CalculateAsset(assetID, entropy);
-                // Null nAmount is considered explicit 0, so just check for commitment
-                CalculateReissuanceToken(assetTokenID, entropy, issuance.nAmount.IsCommitment());
-            } else {
-                //Re-issuance
-
-                // hashAssetIdentifier doubles as the entropy on reissuance
-                CalculateAsset(assetID, issuance.assetEntropy);
-                CalculateReissuanceToken(assetTokenID, issuance.assetEntropy, issuance.nAmount.IsCommitment());
-
-                // Must check that prevout is the blinded issuance token
-                // prevout's asset tag = assetTokenID + assetBlindingNonce
-
-                if (secp256k1_generator_generate_blinded(secp256k1_ctx_verify_amounts, &gen, assetTokenID.begin(), issuance.assetBlindingNonce.begin()) != 1)
-                    return false;
-                if (secp256k1_generator_parse(secp256k1_ctx_verify_amounts, &gencmp, &asset.vchCommitment[0]) != 1)
-                    return false;
-                if (memcmp(&gen, &gencmp, 33))
-                    return false;
-            }
-
-            // Process issuance of asset
-            if (!issuance.nAmount.IsNull()) {
-
-                // Generate asset generator and add to list of surjection targets
-                ret = secp256k1_generator_generate(secp256k1_ctx_verify_amounts, &gen, assetID.begin());
-                assert(ret == 1);
-                CConfidentialAsset issuanceAsset;
-                issuanceAsset.vchCommitment.resize(CConfidentialAsset::nCommittedSize);
-                secp256k1_generator_serialize(secp256k1_ctx_verify_amounts, &issuanceAsset.vchCommitment[0], &gen);
-                targetGenerators.push_back(gen);
-
-                // Build value commitment and add to tally
-                if (issuance.nAmount.IsExplicit()) {
-                    if (!MoneyRange(issuance.nAmount.GetAmount())) {
-                        return false;
-                    }
-
-                    if (issuance.nAmount.GetAmount() == 0) {
-                        continue;
-                    }
-
-                    if (secp256k1_pedersen_commit(secp256k1_ctx_verify_amounts, &commit, explBlinds, issuance.nAmount.GetAmount(), &gen) != 1) {
-                        return false;
-                    }
-                }
-                else if (issuance.nAmount.IsCommitment()) {
-                    if (secp256k1_pedersen_commitment_parse(secp256k1_ctx_verify_amounts, &commit, &issuance.nAmount.vchCommitment[0]) != 1) {
-                        return false;
-                    }
-                } else {
-                    return false;
-                }
-
-                vData.push_back(commit);
-                vpCommitsIn.push_back(p);
-                p++;
-
-                // Rangecheck must be done for blinded amount
-                if (issuance.nAmount.IsCommitment() && QueueCheck(pvChecks, new CRangeCheck(&issuance.nAmount, tx.wit.vtxinwit[i].vchIssuanceAmountRangeproof, issuanceAsset.vchCommitment, CScript(), cacheStore)) != SCRIPT_ERR_OK) {
-                    return false;
-                }
-            }
-
-            // Only initial issuance can have reissuance tokens
-            if (issuance.assetBlindingNonce.IsNull() && !issuance.nInflationKeys.IsNull()) {
-
-                ret = secp256k1_generator_generate(secp256k1_ctx_verify_amounts, &gen, assetTokenID.begin());
-                assert(ret == 1);
-                CConfidentialAsset tokenAsset(assetTokenID);
-                tokenAsset.vchCommitment.resize(CConfidentialAsset::nCommittedSize);
-                secp256k1_generator_serialize(secp256k1_ctx_verify_amounts, &tokenAsset.vchCommitment[0], &gen);
-
-                targetGenerators.push_back(gen);
-
-                if (issuance.nInflationKeys.IsExplicit()) {
-                    if (!MoneyRange(issuance.nInflationKeys.GetAmount())) {
-                        return false;
-                    }
-
-                    if (issuance.nInflationKeys.GetAmount() == 0) {
-                        continue;
-                    }
-
-                    if (secp256k1_pedersen_commit(secp256k1_ctx_verify_amounts, &commit, explBlinds, issuance.nInflationKeys.GetAmount(), &gen) != 1) {
-                        return false;
-                    }
-                }
-                else if (issuance.nInflationKeys.IsCommitment()) {
-                    if (secp256k1_pedersen_commitment_parse(secp256k1_ctx_verify_amounts, &commit, &issuance.nInflationKeys.vchCommitment[0]) != 1) {
-                        return false;
-                    }
-                } else {
-                    return false;
-                }
-
-                vData.push_back(commit);
-                vpCommitsIn.push_back(p);
-                p++;
-
-                if (issuance.nInflationKeys.IsCommitment() && QueueCheck(pvChecks, new CRangeCheck(&issuance.nInflationKeys, tx.wit.vtxinwit[i].vchInflationKeysRangeproof, tokenAsset.vchCommitment, CScript(), cacheStore)) != SCRIPT_ERR_OK) {
-                    return false;
-                }
-            } else if (!issuance.nInflationKeys.IsNull()) {
-                // Token amount field must be null for reissuance
+            // Rangecheck must be done for blinded amount
+            if (issuance.nAmount.IsCommitment() && QueueCheck(pvChecks, new CRangeCheck(&issuance.nAmount, tx.wit.vtxinwit[i].vchIssuanceAmountRangeproof, issuanceAsset.vchCommitment, CScript(), cacheStore)) != SCRIPT_ERR_OK) {
                 return false;
             }
+        }
+
+        // Only initial issuance can have reissuance tokens
+        if (issuance.assetBlindingNonce.IsNull() && !issuance.nInflationKeys.IsNull()) {
+
+            ret = secp256k1_generator_generate(secp256k1_ctx_verify_amounts, &gen, assetTokenID.begin());
+            assert(ret == 1);
+            CConfidentialAsset tokenAsset(assetTokenID);
+            tokenAsset.vchCommitment.resize(CConfidentialAsset::nCommittedSize);
+            secp256k1_generator_serialize(secp256k1_ctx_verify_amounts, &tokenAsset.vchCommitment[0], &gen);
+
+            targetGenerators.push_back(gen);
+
+            if (issuance.nInflationKeys.IsExplicit()) {
+                if (!MoneyRange(issuance.nInflationKeys.GetAmount())) {
+                    return false;
+                }
+
+                if (issuance.nInflationKeys.GetAmount() == 0) {
+                    continue;
+                }
+
+                if (secp256k1_pedersen_commit(secp256k1_ctx_verify_amounts, &commit, explBlinds, issuance.nInflationKeys.GetAmount(), &gen) != 1) {
+                    return false;
+                }
+            }
+            else if (issuance.nInflationKeys.IsCommitment()) {
+                if (secp256k1_pedersen_commitment_parse(secp256k1_ctx_verify_amounts, &commit, &issuance.nInflationKeys.vchCommitment[0]) != 1) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+
+            vData.push_back(commit);
+            vpCommitsIn.push_back(p);
+            p++;
+
+            if (issuance.nInflationKeys.IsCommitment() && QueueCheck(pvChecks, new CRangeCheck(&issuance.nInflationKeys, tx.wit.vtxinwit[i].vchInflationKeysRangeproof, tokenAsset.vchCommitment, CScript(), cacheStore)) != SCRIPT_ERR_OK) {
+                return false;
+            }
+        } else if (!issuance.nInflationKeys.IsNull()) {
+            // Token amount field must be null for reissuance
+            return false;
         }
     }
     for (size_t i = 0; i < tx.vout.size(); ++i)
@@ -1797,20 +1810,28 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo &txund
         txundo.vprevout.reserve(tx.vin.size());
         for (unsigned int i = 0; i < tx.vin.size(); i++) {
             const CTxIn &txin = tx.vin[i];
-            CCoinsModifier coins = inputs.ModifyCoins(txin.prevout.hash);
-            unsigned nPos = txin.prevout.n;
+            if (txin.m_is_pegin) {
+                    std::pair<uint256, COutPoint> outpoint = std::make_pair(uint256(tx.wit.vtxinwit[i].pegin_witness.stack[4]), txin.prevout);
+                    inputs.SetWithdrawSpent(outpoint, true);
+                    // Dummy undo
+                    txundo.vprevout.push_back(CTxInUndo());
 
-            if (nPos >= coins->vout.size() || coins->vout[nPos].IsNull())
-                assert(false);
+            } else {
+                CCoinsModifier coins = inputs.ModifyCoins(txin.prevout.hash);
+                unsigned nPos = txin.prevout.n;
 
-            // mark an outpoint spent, and construct undo information
-            txundo.vprevout.push_back(CTxInUndo(coins->vout[nPos]));
-            coins->Spend(nPos);
-            if (coins->vout.size() == 0) {
-                CTxInUndo& undo = txundo.vprevout.back();
-                undo.nHeight = coins->nHeight;
-                undo.fCoinBase = coins->fCoinBase;
-                undo.nVersion = coins->nVersion;
+                if (nPos >= coins->vout.size() || coins->vout[nPos].IsNull())
+                    assert(false);
+
+                // mark an outpoint spent, and construct undo information
+                txundo.vprevout.push_back(CTxInUndo(coins->vout[nPos]));
+                coins->Spend(nPos);
+                if (coins->vout.size() == 0) {
+                    CTxInUndo& undo = txundo.vprevout.back();
+                    undo.nHeight = coins->nHeight;
+                    undo.fCoinBase = coins->fCoinBase;
+                    undo.nVersion = coins->nVersion;
+                }
             }
         }
     }
@@ -1852,23 +1873,39 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
         for (unsigned int i = 0; i < tx.vin.size(); i++)
         {
             const COutPoint &prevout = tx.vin[i].prevout;
-            const CCoins *coins = inputs.AccessCoins(prevout.hash);
-            assert(coins);
+            if (tx.vin[i].m_is_pegin) {
+                // Check existence and validity of pegin witness
+                if (tx.wit.vtxinwit.size() <= i || !IsValidPeginWitness(tx.wit.vtxinwit[i].pegin_witness) || prevout.hash != uint256(tx.wit.vtxinwit[i].pegin_witness.stack[0]) || prevout.n != CScriptNum(tx.wit.vtxinwit[i].pegin_witness.stack[1], true).getint()) {
+                    return state.DoS(0, false, REJECT_PEGIN, "bad-pegin-witness", true);
+                }
+                std::pair<uint256, COutPoint> pegin = std::make_pair(uint256(tx.wit.vtxinwit[i].pegin_witness.stack[4]), prevout);
+                if (inputs.IsWithdrawSpent(pegin)) {
+                    return state.Invalid(false, REJECT_INVALID, "bad-txns-double-withdraw", strprintf("Double-withdraw of %s:%d", prevout.hash.ToString(), prevout.n));
+                }
+                if (setPeginsSpent.count(pegin)) {
+                    return state.DoS(100, false, REJECT_INVALID, "bad-txns-double-withdraw-in-obj", false,
+                        strprintf("Double-withdraw of %s:%d in single tx/block", prevout.hash.ToString(), prevout.n));
+                }
+                setPeginsSpent.insert(pegin);
+            } else {
+                const CCoins *coins = inputs.AccessCoins(prevout.hash);
+                assert(coins);
 
-            // If prev is coinbase, check that it's matured
-            if (coins->IsCoinBase()) {
-                if (nSpendHeight - coins->nHeight < COINBASE_MATURITY)
-                    return state.Invalid(false,
-                        REJECT_INVALID, "bad-txns-premature-spend-of-coinbase",
-                        strprintf("tried to spend coinbase at depth %d", nSpendHeight - coins->nHeight));
-            }
+                // If prev is coinbase, check that it's matured
+                if (coins->IsCoinBase()) {
+                    if (nSpendHeight - coins->nHeight < COINBASE_MATURITY)
+                        return state.Invalid(false,
+                            REJECT_INVALID, "bad-txns-premature-spend-of-coinbase",
+                            strprintf("tried to spend coinbase at depth %d", nSpendHeight - coins->nHeight));
+                }
 
-            // Check for negative or overflow input values
-            const CConfidentialValue& value = coins->vout[prevout.n].nValue;
-            if (value.IsExplicit()) {
-                nValueIn += value.GetAmount();
-                if (!MoneyRange(value.GetAmount()) || !MoneyRange(nValueIn))
-                    return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputvalues-outofrange");
+                // Check for negative or overflow input values
+                const CConfidentialValue& value = coins->vout[prevout.n].nValue;
+                if (value.IsExplicit()) {
+                    nValueIn += value.GetAmount();
+                    if (!MoneyRange(value.GetAmount()) || !MoneyRange(nValueIn))
+                        return state.DoS(100, false, REJECT_INVALID, "bad-txns-inputvalues-outofrange");
+                }
             }
 
         }
@@ -1906,7 +1943,19 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
         if (fScriptChecks) {
             for (unsigned int i = 0; i < tx.vin.size(); i++) {
                 const COutPoint &prevout = tx.vin[i].prevout;
-                const CCoins* coins = inputs.AccessCoins(prevout.hash);
+                // If input is peg-in, create "coin" to evaluate against
+                CCoins pegin_coin;
+                if (tx.vin[i].m_is_pegin) {
+                    CMutableTransaction mtx;
+                    mtx.vout.resize(prevout.n);
+                    mtx.vout.push_back(GetPeginOutputFromWitness(tx.wit.vtxinwit[i].pegin_witness));
+                    CTransaction tx(mtx);
+                    // Height of "output" in script evaluation will be 0
+                    pegin_coin.FromTx(tx, 0);
+                }
+
+                // from pegin_witness
+                const CCoins* coins = tx.vin[i].m_is_pegin ? &pegin_coin : inputs.AccessCoins(prevout.hash);
                 assert(coins);
 
                 // Verify signature
@@ -2024,30 +2073,44 @@ bool AbortNode(CValidationState& state, const std::string& strMessage, const std
  * @param out The out point that corresponds to the tx input.
  * @return True on success.
  */
-bool ApplyTxInUndo(const CTxInUndo& undo, CCoinsViewCache& view, const COutPoint& out, const CTxIn& txin)
+bool ApplyTxInUndo(const CTxInUndo& undo, CCoinsViewCache& view, const COutPoint& out, const CTxIn& txin, const CScriptWitness& pegin_witness)
 {
     bool fClean = true;
 
-    CCoinsModifier coins = view.ModifyCoins(out.hash);
-    if (undo.nHeight != 0 ||
-            // Special-case genesis since nHeight is always 0, assume DB is clean
-            (Params().GenesisBlock().vtx[0]->GetHash() == out.hash && coins->IsPruned())) {
-        // undo data contains height: this is the last output of the prevout tx being spent
-        if (!coins->IsPruned())
-            fClean = fClean && error("%s: undo data overwriting existing transaction", __func__);
-        coins->Clear();
-        coins->fCoinBase = undo.fCoinBase;
-        coins->nHeight = undo.nHeight;
-        coins->nVersion = undo.nVersion;
+    if (!txin.m_is_pegin) {
+        CCoinsModifier coins = view.ModifyCoins(out.hash);
+        if (undo.nHeight != 0 ||
+                // Special-case genesis since nHeight is always 0, assume DB is clean
+                (Params().GenesisBlock().vtx[0]->GetHash() == out.hash && coins->IsPruned())) {
+            // undo data contains height: this is the last output of the prevout tx being spent
+            if (!coins->IsPruned())
+                fClean = fClean && error("%s: undo data overwriting existing transaction", __func__);
+            coins->Clear();
+            coins->fCoinBase = undo.fCoinBase;
+            coins->nHeight = undo.nHeight;
+            coins->nVersion = undo.nVersion;
+        } else {
+            if (coins->IsPruned())
+                fClean = fClean && error("%s: undo data adding output to missing transaction", __func__);
+        }
+        if (coins->IsAvailable(out.n))
+            fClean = fClean && error("%s: undo data overwriting existing output", __func__);
+        if (coins->vout.size() < out.n+1)
+            coins->vout.resize(out.n+1);
+        coins->vout[out.n] = undo.txout;
     } else {
-        if (coins->IsPruned())
-            fClean = fClean && error("%s: undo data adding output to missing transaction", __func__);
+        if (!IsValidPeginWitness(pegin_witness)) {
+            fClean = fClean && error("%s: peg-in occurred without proof", __func__);
+        } else {
+            std::pair<uint256, COutPoint> outpoint = std::make_pair(uint256(pegin_witness.stack[4]), txin.prevout);
+            bool fSpent = view.IsWithdrawSpent(outpoint);
+            if (!fSpent) {
+                fClean = fClean && error("%s: peg-in bitcoin txid not marked spent", __func__);
+            } else {
+                view.SetWithdrawSpent(outpoint, false);
+            }
+        }
     }
-    if (coins->IsAvailable(out.n))
-        fClean = fClean && error("%s: undo data overwriting existing output", __func__);
-    if (coins->vout.size() < out.n+1)
-        coins->vout.resize(out.n+1);
-    coins->vout[out.n] = undo.txout;
 
     return fClean;
 }
@@ -2103,7 +2166,8 @@ bool DisconnectBlock(const CBlock& block, CValidationState& state, const CBlockI
             for (unsigned int j = tx.vin.size(); j-- > 0;) {
                 const COutPoint &out = tx.vin[j].prevout;
                 const CTxInUndo &undo = txundo.vprevout[j];
-                if (!ApplyTxInUndo(undo, view, out, tx.vin[j]))
+                const CScriptWitness &pegin_wit = tx.wit.vtxinwit.size() > j ? tx.wit.vtxinwit[j].pegin_witness : CScriptWitness();
+                if (!ApplyTxInUndo(undo, view, out, tx.vin[j], pegin_wit))
                     fClean = false;
             }
         }
@@ -2624,7 +2688,11 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             // be in ConnectBlock because they require the UTXO set
             prevheights.resize(tx.vin.size());
             for (size_t j = 0; j < tx.vin.size(); j++) {
-                prevheights[j] = view.AccessCoins(tx.vin[j].prevout.hash)->nHeight;
+                if (tx.vin[j].m_is_pegin) {
+                    prevheights[j] = -1;
+                } else {
+                    prevheights[j] = view.AccessCoins(tx.vin[j].prevout.hash)->nHeight;
+                }
             }
 
             if (!SequenceLocks(tx, nLockTimeFlags, &prevheights, *pindex)) {
@@ -2647,10 +2715,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         {
             std::vector<CCheck*> vChecks;
             bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks (still consult the cache, though) */
-            if (!CheckInputs(tx, state, view, fScriptChecks, flags, fCacheResults, txdata[i], setPeginsSpent == NULL ? setPeginsSpentDummy : *setPeginsSpent, nScriptCheckThreads ? &vChecks : NULL)) {
+            if (!CheckInputs(tx, state, view, fScriptChecks, flags, fCacheResults, txdata[i], setPeginsSpent == NULL ? setPeginsSpentDummy : *setPeginsSpent, nScriptCheckThreads ? &vChecks : NULL))
                 return error("ConnectBlock(): CheckInputs on %s failed with %s",
                     tx.GetHash().ToString(), FormatStateMessage(state));
-            }
             control.Add(vChecks);
         }
 
