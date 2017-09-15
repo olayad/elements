@@ -3085,7 +3085,26 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
         if (!rv) {
             if (state.IsInvalid()) {
                 InvalidBlockFound(pindexNew, state);
-             }
+                //Possibly result of RPC to bitcoind failure
+                //or unseen Bitcoin blocks.
+                if (state.GetRejectCode() == REJECT_PEGIN) {
+                    //Write queue of invalid blocks that
+                    //must be cleared to continue operation
+                    std::vector<uint256> vinvalidBlocks;
+                    pblocktree->ReadInvalidBlockQueue(vinvalidBlocks);
+                    bool blockAlreadyInvalid = false;
+                    BOOST_FOREACH(uint256& hash, vinvalidBlocks) {
+                        if (hash == pblock->GetHash()) {
+                            blockAlreadyInvalid = true;
+                            break;
+                        }
+                    }
+                    if (!blockAlreadyInvalid) {
+                        vinvalidBlocks.push_back(pblock->GetHash());
+                        pblocktree->WriteInvalidBlockQueue(vinvalidBlocks);
+                    }
+                }
+            }
 
             return error("ConnectTip(): ConnectBlock %s failed", pindexNew->GetBlockHash().ToString());
         }
