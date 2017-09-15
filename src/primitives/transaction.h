@@ -510,9 +510,12 @@ public:
 class CTxInWitness
 {
 public:
+    // TODO generalize CScriptWitness into just CWitness
     std::vector<unsigned char> vchIssuanceAmountRangeproof;
     std::vector<unsigned char> vchInflationKeysRangeproof;
     CScriptWitness scriptWitness;
+    // Re-use script witness struct to include its own witness
+    CScriptWitness pegin_witness;
 
     ADD_SERIALIZE_METHODS;
 
@@ -522,19 +525,22 @@ public:
         READWRITE(vchIssuanceAmountRangeproof);
         READWRITE(vchInflationKeysRangeproof);
         READWRITE(scriptWitness.stack);
+        READWRITE(pegin_witness.stack);
     }
 
     CTxInWitness() { }
 
     bool IsNull() const
     {
-        return vchIssuanceAmountRangeproof.empty() && vchInflationKeysRangeproof.empty() && scriptWitness.IsNull();
+        return vchIssuanceAmountRangeproof.empty() && vchInflationKeysRangeproof.empty() && scriptWitness.IsNull()
+            && pegin_witness.IsNull();
     }
     void SetNull()
     {
         vchIssuanceAmountRangeproof.clear();
         vchInflationKeysRangeproof.clear();
         scriptWitness.stack.clear();
+        pegin_witness.stack.clear();
     }
 
     uint256 GetHash() const;
