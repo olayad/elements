@@ -598,17 +598,9 @@ class CTransaction(object):
 
     def deserialize(self, f):
         self.nVersion = struct.unpack("<i", f.read(4))[0]
+        flags = struct.unpack("<B", f.read(1))[0]
         self.vin = deser_vector(f, CTxIn)
-        flags = 0
-        if len(self.vin) == 0:
-            flags = struct.unpack("<B", f.read(1))[0]
-            # Not sure why flags can't be zero, but this
-            # matches the implementation in bitcoind
-            if (flags != 0):
-                self.vin = deser_vector(f, CTxIn)
-                self.vout = deser_vector(f, CTxOut)
-        else:
-            self.vout = deser_vector(f, CTxOut)
+        self.vout = deser_vector(f, CTxOut)
         if flags & 1 > 0:
             self.wit.vtxinwit = [CTxInWitness() for i in range(len(self.vin))]
             self.wit.vtxoutwit = [CTxOutWitness() for i in range(len(self.vout))]
@@ -636,10 +628,7 @@ class CTransaction(object):
             flags |= 1
         r = b""
         r += struct.pack("<i", self.nVersion)
-        if flags:
-            dummy = []
-            r += ser_vector(dummy)
-            r += struct.pack("<B", flags)
+        r += struct.pack("<B", flags)
         r += ser_vector(self.vin)
         r += ser_vector(self.vout)
         if flags & 1:
