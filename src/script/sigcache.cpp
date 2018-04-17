@@ -189,35 +189,16 @@ bool CachingRangeProofChecker::VerifyRangeProof(const std::vector<unsigned char>
     return true;
 }
 
-bool CachingSurjectionProofChecker::VerifySurjectionProof(secp256k1_surjectionproof& proof, std::vector<secp256k1_generator>& vTags, secp256k1_generator& gen, const secp256k1_context* secp256k1_ctx_verify_amounts) const
+bool CachingSurjectionProofChecker::VerifySurjectionProof(secp256k1_surjectionproof& proof, std::vector<secp256k1_generator>& vTags, secp256k1_generator& gen, const secp256k1_context* secp256k1_ctx_verify_amounts, const uint256& wtxid) const
 {
-    // Serialize objects
-    std::vector<unsigned char> vchproof;
-    size_t proof_len = 0;
-    vchproof.resize(secp256k1_surjectionproof_serialized_size(secp256k1_ctx_verify_amounts, &proof));
-    secp256k1_surjectionproof_serialize(secp256k1_ctx_verify_amounts, &vchproof[0], &proof_len, &proof);
-
-    std::vector<unsigned char> tagCommit;
-    tagCommit.resize(33);
-    CSHA256 sha2;
-    for (unsigned int i = 0; i <vTags.size(); i++) {
-        secp256k1_generator_serialize(secp256k1_ctx_verify_amounts, tagCommit.data(), &vTags[i]);
-        sha2.Write(tagCommit.data(), tagCommit.size());
-    }
-    tagCommit.resize(32);
-    sha2.Finalize(tagCommit.data());
-
-    std::vector<unsigned char> vchGen;
-    vchGen.resize(CConfidentialValue::nCommittedSize);
-    secp256k1_generator_serialize(secp256k1_ctx_verify_amounts, &vchGen[0], &gen);
-
-    CPubKey pubkey(vchGen);
+    // wtxid commits to all witness data, asset commitment is checked against rangeproof witness
     uint256 entry;
-    surjectionProofCache.ComputeEntry(entry, uint256(tagCommit), vchproof, pubkey, vchGen, CScript());
+    surjectionProofCache.ComputeEntry(entry, wtxid, std::vector<unsigned char>(std::begin(gen.data), std::end(gen.data)));
 
     if (surjectionProofCache.Get(entry, !store)) {
         return true;
     }
+
 
     if (secp256k1_surjectionproof_verify(secp256k1_ctx_verify_amounts, &proof, vTags.data(), vTags.size(), &gen) != 1) {
         return false;
