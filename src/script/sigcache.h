@@ -33,6 +33,21 @@ public:
     bool VerifySignature(const std::vector<unsigned char>& vchSig, const CPubKey& vchPubKey, const uint256& sighash) const;
 };
 
+class CachingAssetsChecker
+{
+private:
+    bool store;
+public:
+    CachingAssetsChecker(bool store_in){
+        store = store_in;
+    };
+
+    bool VerifySuccessCached(const uint256& wtxid) const;
+    void CacheSuccess(const uint256& wtxid) const;
+};
+
+
 void InitSignatureCache();
+void InitAssetsCache();
 
 #endif // BITCOIN_SCRIPT_SIGCACHE_H

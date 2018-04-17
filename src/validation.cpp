@@ -592,14 +592,14 @@ static Secp256k1Ctx instance_of_secp256k1ctx;
 class CRangeCheck : public CCheck
 {
 private:
-    const std::vector<unsigned char>& rangeproof;
-    // *Must* be a commitment, not an explicit value
     const std::vector<unsigned char> value_commitment;
-    const std::vector<unsigned char> assetCommitment;
+    const std::vector<unsigned char> rangeproof;
+    // *Must* be a commitment, not an explicit value
+    const std::vector<unsigned char> asset_commitment;
     const CScript scriptPubKey;
 
 public:
-    CRangeCheck(const std::vector<unsigned char>& value_commitment_, const std::vector<unsigned char>& rangeproof_, const std::vector<unsigned char>& assetCommitment_, const CScript& scriptPubKey_) : value_commitment(value_commitment_), rangeproof(rangeproof_), assetCommitment(assetCommitment_), scriptPubKey(scriptPubKey_) {}
+    CRangeCheck(const std::vector<unsigned char>& value_commitment_, const std::vector<unsigned char>& rangeproof_, const std::vector<unsigned char>& asset_commitment_, const CScript& scriptPubKey_) : value_commitment(value_commitment_), rangeproof(rangeproof_), asset_commitment(asset_commitment_), scriptPubKey(scriptPubKey_) {}
 
     bool operator()();
 };
@@ -734,8 +734,6 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
     memset(explBlinds, 0, sizeof(explBlinds));
     int ret;
 
-    uint256 wtxid(tx.GetHashWithWitness());
-
     // This list is used to verify surjection proofs.
     // Proofs must be constructed with the list being in
     // order of input and non-null issuance pseudo-inputs, with
@@ -865,7 +863,7 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
             p++;
 
             // Rangecheck must be done for blinded amount
-            if (issuance.nAmount.IsCommitment() && QueueCheck(pvChecks, new CRangeCheck(&issuance.nAmount, tx.wit.vtxinwit[i].vchIssuanceAmountRangeproof, issuanceAsset.vchCommitment, CScript(), wtxid)) != SCRIPT_ERR_OK) {
+            if (issuance.nAmount.IsCommitment() && QueueCheck(pvChecks, new CRangeCheck(issuance.nAmount.vchCommitment, tx.wit.vtxinwit[i].vchIssuanceAmountRangeproof, issuanceAsset.vchCommitment, CScript())) != SCRIPT_ERR_OK) {
                 return false;
             }
         }
@@ -906,7 +904,7 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
             vpCommitsIn.push_back(p);
             p++;
 
-            if (issuance.nInflationKeys.IsCommitment() && QueueCheck(pvChecks, new CRangeCheck(&issuance.nInflationKeys, tx.wit.vtxinwit[i].vchInflationKeysRangeproof, tokenAsset.vchCommitment, CScript(), wtxid)) != SCRIPT_ERR_OK) {
+            if (issuance.nInflationKeys.IsCommitment() && QueueCheck(pvChecks, new CRangeCheck(issuance.nInflationKeys.vchCommitment, tx.wit.vtxinwit[i].vchInflationKeysRangeproof, tokenAsset.vchCommitment, CScript())) != SCRIPT_ERR_OK) {
                 return false;
             }
         } else if (!issuance.nInflationKeys.IsNull()) {
@@ -991,7 +989,7 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
         if (!ptxoutwit || ptxoutwit->vchRangeproof.size() > 5000) {
             return false;
         }
-        if (QueueCheck(pvChecks, new CRangeCheck(&val, ptxoutwit->vchRangeproof, vchAssetCommitment, tx.vout[i].scriptPubKey, wtxid)) != SCRIPT_ERR_OK) {
+        if (QueueCheck(pvChecks, new CRangeCheck(val.vchCommitment, ptxoutwit->vchRangeproof, vchAssetCommitment, tx.vout[i].scriptPubKey)) != SCRIPT_ERR_OK) {
             return false;
         }
     }
@@ -1016,7 +1014,7 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
         if (secp256k1_surjectionproof_parse(secp256k1_ctx_verify_amounts, &proof, &ptxoutwit->vchSurjectionproof[0], ptxoutwit->vchSurjectionproof.size()) != 1)
             return false;
 
-        if (QueueCheck(pvChecks, new CSurjectionCheck(proof, targetGenerators, gen, wtxid)) != SCRIPT_ERR_OK) {
+        if (QueueCheck(pvChecks, new CSurjectionCheck(proof, targetGenerators, gen)) != SCRIPT_ERR_OK) {
             return false;
         }
     }
@@ -1919,9 +1917,20 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
         if (!tx.HasValidFee()) {
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-fee-outofrange");
         }
-        if (fScriptChecks && !VerifyAmounts(inputs, tx, pvChecks, cacheStore)) {
-            return state.DoS(100, false, REJECT_INVALID, "bad-txns-in-ne-out", false,
-                strprintf("value in (%s) != value out", FormatMoney(nValueIn)));
+        if (fScriptChecks) {
+            CachingAssetsChecker asset_checker(cacheStore);
+            if (!asset_checker.VerifySuccessCached(tx.GetHashWithWitness())) {
+                if (!VerifyAmounts(inputs, tx, pvChecks)) {
+                    return state.DoS(100, false, REJECT_INVALID, "bad-txns-in-ne-out", true,
+                        strprintf("value in (%s) != value out", FormatMoney(nValueIn)));
+                }
+                // We don't cache even if cacheStore is set if we are testing(not connecting)
+                // a block and the cache checker misses. Assumes we only do multithreaded
+                // validation for blocks...
+                if (!(cacheStore && pvChecks)) {
+                    asset_checker.CacheSuccess(tx.GetHashWithWitness());
+                }
+            }
         }
 
     return true;

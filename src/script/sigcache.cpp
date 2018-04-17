@@ -63,11 +63,6 @@ public:
         CSHA256().Write(nonce.begin(), 32).Write(hash.begin(), 32).Write(&pubkey[0], pubkey.size()).Write(&vchSig[0], vchSig.size()).Write(&vchCommitment[0], vchCommitment.size()).Write(&scriptPubKey[0], scriptPubKey.size()).Finalize(entry.begin());
     }
 
-    void ComputeEntry(uint256& entry, const uint256& wtxid, const std::vector<unsigned char>& commitment)
-    {
-        CSHA256().Write(nonce.begin(), 32).Write(wtxid.begin(), 32).Write(commitment.data(), 32).Finalize(entry.begin());
-    }
-
     bool
     Get(const uint256& entry, const bool erase)
     {
@@ -110,13 +105,13 @@ void InitSignatureCache()
             (nElems*sizeof(uint256)) >>20, nMaxCacheSize>>20, nElems);
 }
 
-// To be called once in AppInit2/TestingSetup to initialize the surjectionrproof cache
+// To be called once in AppInit2/TestingSetup to initialize the assets cache
 void InitAssetsCache()
 {
     // nMaxCacheSize is unsigned. If -maxsigcachesize is set to zero,
     // setup_bytes creates the minimum possible cache (2 elements).
     size_t nMaxCacheSize = std::min(std::max((int64_t)0, GetArg("-maxsigcachesize", DEFAULT_MAX_SIG_CACHE_SIZE)), MAX_MAX_SIG_CACHE_SIZE) * ((size_t) 1 << 20);
-    size_t nElems = surjectionProofCache.setup_bytes(nMaxCacheSize);
+    size_t nElems = assets_cache.setup_bytes(nMaxCacheSize);
     LogPrintf("Using %zu MiB out of %zu requested for assets cache, able to store %zu elements\n",
             (nElems*sizeof(uint256)) >>20, nMaxCacheSize>>20, nElems);
 }
@@ -134,53 +129,10 @@ bool CachingTransactionSignatureChecker::VerifySignature(const std::vector<unsig
     return true;
 }
 
-bool CachingRangeProofChecker::VerifyRangeProof(const std::vector<unsigned char>& vchRangeProof, const std::vector<unsigned char>& vchValueCommitment, const std::vector<unsigned char>& vchAssetCommitment, const CScript& scriptPubKey, const secp256k1_context* secp256k1_ctx_verify_amounts, const uint256& wtxid) const
-{
-    uint256 entry;
-    // wtxid commits to all witness data, value commitment is checked against rangeproof witness
-    rangeProofCache.ComputeEntry(entry, wtxid, vchValueCommitment);
-
-    if (rangeProofCache.Get(wtxid, !store)) {
-        return true;
-    }
-
-    if (vchRangeProof.size() == 0) {
-        return false;
-    }
-
-    uint64_t min_value, max_value;
-    secp256k1_pedersen_commitment commit;
-    if (secp256k1_pedersen_commitment_parse(secp256k1_ctx_verify_amounts, &commit, &vchValueCommitment[0]) != 1)
-            return false;
-
-    secp256k1_generator tag;
-    if (secp256k1_generator_parse(secp256k1_ctx_verify_amounts, &tag, &vchAssetCommitment[0]) != 1)
-        return false;
-
-    if (!secp256k1_rangeproof_verify(secp256k1_ctx_verify_amounts, &min_value, &max_value, &commit, vchRangeProof.data(), vchRangeProof.size(), scriptPubKey.size() ? &scriptPubKey.front() : NULL, scriptPubKey.size(), &tag)) {
-        return false;
-    }
-
-    // An rangeproof is not valid if the output is spendable but the minimum number
-    // is 0. This is to prevent people passing 0-value tokens around, or conjuring
-    // reissuance tokens from nothing then attempting to reissue an asset.
-    // ie reissuance doesn't require revealing value of reissuance output
-    // Issuances proofs are always "unspendable" as they commit to an empty script.
-    if (min_value == 0 && !scriptPubKey.IsUnspendable()) {
-        return false;
-    }
-
-    rangeProofCache.Set(entry);
-
-    return true;
-}
-
-}
-
 // This only checks if success has been cached
 bool CachingAssetsChecker::VerifySuccessCached(const uint256& wtxid) const
 {
-    if (assets_cache.Get(wtxid, false)) {
+    if (assets_cache.Get(wtxid, !store)) {
         return true;
     }
     return false;
@@ -188,5 +140,8 @@ bool CachingAssetsChecker::VerifySuccessCached(const uint256& wtxid) const
 
 void CachingAssetsChecker::CacheSuccess(const uint256& wtxid) const
 {
-    assets_cache.Set(wtxid);
+    uint256 copy(wtxid);
+    if (store) {
+        assets_cache.Set(copy);
+    }
 }

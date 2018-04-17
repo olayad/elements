@@ -43,6 +43,7 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName, const std::st
         SetupEnvironment();
         SetupNetworking();
         InitSignatureCache();
+        InitAssetsCache();
         fPrintToDebugLog = false; // don't want to write to debug.log file
         fCheckBlockIndex = true;
         // Hack to allow testing of fedpeg args
