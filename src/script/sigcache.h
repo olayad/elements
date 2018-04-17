@@ -33,34 +33,6 @@ public:
     bool VerifySignature(const std::vector<unsigned char>& vchSig, const CPubKey& vchPubKey, const uint256& sighash) const;
 };
 
-class CachingRangeProofChecker
-{
-private:
-    bool store;
-public:
-    CachingRangeProofChecker(bool storeIn){
-        store = storeIn;
-    };
-
-    bool VerifyRangeProof(const std::vector<unsigned char>& vchRangeProof, const std::vector<unsigned char>& vchValueCommitment, const std::vector<unsigned char>& vchAssetCommitment, const CScript& scriptPubKey, const secp256k1_context* ctx, const uint256& wtxid) const;
-
-};
-
-class CachingSurjectionProofChecker
-{
-private:
-    bool store;
-public:
-    CachingSurjectionProofChecker(bool storeIn){
-        store = storeIn;
-    };
-
-    bool VerifySurjectionProof(secp256k1_surjectionproof& proof, std::vector<secp256k1_generator>& vTags, secp256k1_generator& gen, const secp256k1_context* ctx, const uint256& wtxid) const;
-
-};
-
 void InitSignatureCache();
-void InitRangeproofCache();
-void InitSurjectionproofCache();
 
 #endif // BITCOIN_SCRIPT_SIGCACHE_H

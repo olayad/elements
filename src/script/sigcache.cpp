@@ -94,10 +94,6 @@ public:
 */
 static CSignatureCache signatureCache;
 
-static CSignatureCache rangeProofCache;
-
-static CSignatureCache surjectionProofCache;
-
 
 }
 
@@ -109,28 +105,6 @@ void InitSignatureCache()
     size_t nMaxCacheSize = std::min(std::max((int64_t)0, GetArg("-maxsigcachesize", DEFAULT_MAX_SIG_CACHE_SIZE)), MAX_MAX_SIG_CACHE_SIZE) * ((size_t) 1 << 20);
     size_t nElems = signatureCache.setup_bytes(nMaxCacheSize);
     LogPrintf("Using %zu MiB out of %zu requested for signature cache, able to store %zu elements\n",
-            (nElems*sizeof(uint256)) >>20, nMaxCacheSize>>20, nElems);
-}
-
-// To be called once in AppInit2/TestingSetup to initialize the rangeproof cache
-void InitRangeproofCache()
-{
-    // nMaxCacheSize is unsigned. If -maxsigcachesize is set to zero,
-    // setup_bytes creates the minimum possible cache (2 elements).
-    size_t nMaxCacheSize = std::min(std::max((int64_t)0, GetArg("-maxsigcachesize", DEFAULT_MAX_SIG_CACHE_SIZE)), MAX_MAX_SIG_CACHE_SIZE) * ((size_t) 1 << 20);
-    size_t nElems = rangeProofCache.setup_bytes(nMaxCacheSize);
-    LogPrintf("Using %zu MiB out of %zu requested for rangeproof cache, able to store %zu elements\n",
-            (nElems*sizeof(uint256)) >>20, nMaxCacheSize>>20, nElems);
-}
-
-// To be called once in AppInit2/TestingSetup to initialize the surjectionrproof cache
-void InitSurjectionproofCache()
-{
-    // nMaxCacheSize is unsigned. If -maxsigcachesize is set to zero,
-    // setup_bytes creates the minimum possible cache (2 elements).
-    size_t nMaxCacheSize = std::min(std::max((int64_t)0, GetArg("-maxsigcachesize", DEFAULT_MAX_SIG_CACHE_SIZE)), MAX_MAX_SIG_CACHE_SIZE) * ((size_t) 1 << 20);
-    size_t nElems = surjectionProofCache.setup_bytes(nMaxCacheSize);
-    LogPrintf("Using %zu MiB out of %zu requested for surjectionproof cache, able to store %zu elements\n",
             (nElems*sizeof(uint256)) >>20, nMaxCacheSize>>20, nElems);
 }
 
@@ -189,22 +163,4 @@ bool CachingRangeProofChecker::VerifyRangeProof(const std::vector<unsigned char>
     return true;
 }
 
-bool CachingSurjectionProofChecker::VerifySurjectionProof(secp256k1_surjectionproof& proof, std::vector<secp256k1_generator>& vTags, secp256k1_generator& gen, const secp256k1_context* secp256k1_ctx_verify_amounts, const uint256& wtxid) const
-{
-    // wtxid commits to all witness data, asset commitment is checked against rangeproof witness
-    uint256 entry;
-    surjectionProofCache.ComputeEntry(entry, wtxid, std::vector<unsigned char>(std::begin(gen.data), std::end(gen.data)));
-
-    if (surjectionProofCache.Get(entry, !store)) {
-        return true;
-    }
-
-
-    if (secp256k1_surjectionproof_verify(secp256k1_ctx_verify_amounts, &proof, vTags.data(), vTags.size(), &gen) != 1) {
-        return false;
-    }
-
-    surjectionProofCache.Set(entry);
-
-    return true;
 }

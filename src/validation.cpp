@@ -592,16 +592,14 @@ static Secp256k1Ctx instance_of_secp256k1ctx;
 class CRangeCheck : public CCheck
 {
 private:
-    const CConfidentialValue* val;
     const std::vector<unsigned char>& rangeproof;
     // *Must* be a commitment, not an explicit value
+    const std::vector<unsigned char> value_commitment;
     const std::vector<unsigned char> assetCommitment;
     const CScript scriptPubKey;
-    const uint256 wtxid;
-    const bool store;
 
 public:
-    CRangeCheck(const CConfidentialValue* val_, const std::vector<unsigned char>& rangeproof_, const std::vector<unsigned char>& assetCommitment_, const CScript& scriptPubKey_, const uint256& wtxid_, const bool storeIn) : val(val_), rangeproof(rangeproof_), assetCommitment(assetCommitment_), scriptPubKey(scriptPubKey_), wtxid(wtxid_), store(storeIn) {}
+    CRangeCheck(const std::vector<unsigned char>& value_commitment_, const std::vector<unsigned char>& rangeproof_, const std::vector<unsigned char>& assetCommitment_, const CScript& scriptPubKey_) : value_commitment(value_commitment_), rangeproof(rangeproof_), assetCommitment(assetCommitment_), scriptPubKey(scriptPubKey_) {}
 
     bool operator()();
 };
@@ -629,10 +627,8 @@ private:
     secp256k1_surjectionproof proof;
     std::vector<secp256k1_generator> vTags;
     secp256k1_generator gen;
-    uint256 wtxid;
-    const bool store;
 public:
-    CSurjectionCheck(secp256k1_surjectionproof& proof_in, std::vector<secp256k1_generator>& tags_in, secp256k1_generator& gen_in, uint256& wtxid_in, const bool store_in) : proof(proof_in), vTags(tags_in), gen(gen_in), wtxid(wtxid_in), store(store_in) {}
+    CSurjectionCheck(secp256k1_surjectionproof& proof_in, std::vector<secp256k1_generator>& tags_in, secp256k1_generator& gen_in) : proof(proof_in), vTags(tags_in), gen(gen_in) {}
 
     bool operator()();
 };
@@ -653,12 +649,32 @@ static inline ScriptError QueueCheck(std::vector<CCheck*>* queue, CCheck* check)
 
 bool CRangeCheck::operator()()
 {
-    if (val->IsExplicit()) {
-        return true;
+    // TODO make sure all rangechecks simply don't happen on explicit values
+    if (rangeproof.size() == 0) {
+        return false;
     }
 
-    if (!CachingRangeProofChecker(store).VerifyRangeProof(rangeproof, val->vchCommitment, assetCommitment, scriptPubKey, secp256k1_ctx_verify_amounts, wtxid)) {
-        error = SCRIPT_ERR_RANGEPROOF;
+    uint64_t min_value, max_value;
+    secp256k1_pedersen_commitment commit;
+    if (secp256k1_pedersen_commitment_parse(secp256k1_ctx_verify_amounts, &commit, value_commitment.data()) != 1) {
+        return false;
+    }
+
+    secp256k1_generator tag;
+    if (secp256k1_generator_parse(secp256k1_ctx_verify_amounts, &tag, asset_commitment.data()) != 1) {
+        return false;
+    }
+
+    if (!secp256k1_rangeproof_verify(secp256k1_ctx_verify_amounts, &min_value, &max_value, &commit, rangeproof.data(), rangeproof.size(), scriptPubKey.size() ? scriptPubKey.data() : NULL, scriptPubKey.size(), &tag)) {
+        return false;
+    }
+
+    // An rangeproof is not valid if the output is spendable but the minimum number
+    // is 0. This is to prevent people passing 0-value tokens around, or conjuring
+    // reissuance tokens from nothing then attempting to reissue an asset.
+    // ie reissuance doesn't require revealing value of reissuance output
+    // Issuances proofs are always "unspendable" as they commit to an empty script.
+    if (min_value == 0 && !scriptPubKey.IsUnspendable()) {
         return false;
     }
 
@@ -678,7 +694,10 @@ bool CBalanceCheck::operator()()
 
 bool CSurjectionCheck::operator()()
 {
-    return CachingSurjectionProofChecker(store).VerifySurjectionProof(proof, vTags, gen, secp256k1_ctx_verify_amounts, wtxid);
+    if (secp256k1_surjectionproof_verify(secp256k1_ctx_verify_amounts, &proof, vTags.data(), vTags.size(), &gen) != 1) {
+        return false;
+    }
+    return true;
 }
 
 } // namespace
@@ -699,7 +718,7 @@ size_t GetNumIssuances(const CTransaction& tx)
     return numIssuances;
 }
 
-bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::vector<CCheck*>* pvChecks, const bool cacheStore)
+bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::vector<CCheck*>* pvChecks)
 {
     assert(!tx.IsCoinBase());
 
@@ -846,7 +865,7 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
             p++;
 
             // Rangecheck must be done for blinded amount
-            if (issuance.nAmount.IsCommitment() && QueueCheck(pvChecks, new CRangeCheck(&issuance.nAmount, tx.wit.vtxinwit[i].vchIssuanceAmountRangeproof, issuanceAsset.vchCommitment, CScript(), wtxid, cacheStore)) != SCRIPT_ERR_OK) {
+            if (issuance.nAmount.IsCommitment() && QueueCheck(pvChecks, new CRangeCheck(&issuance.nAmount, tx.wit.vtxinwit[i].vchIssuanceAmountRangeproof, issuanceAsset.vchCommitment, CScript(), wtxid)) != SCRIPT_ERR_OK) {
                 return false;
             }
         }
@@ -887,7 +906,7 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
             vpCommitsIn.push_back(p);
             p++;
 
-            if (issuance.nInflationKeys.IsCommitment() && QueueCheck(pvChecks, new CRangeCheck(&issuance.nInflationKeys, tx.wit.vtxinwit[i].vchInflationKeysRangeproof, tokenAsset.vchCommitment, CScript(), wtxid, cacheStore)) != SCRIPT_ERR_OK) {
+            if (issuance.nInflationKeys.IsCommitment() && QueueCheck(pvChecks, new CRangeCheck(&issuance.nInflationKeys, tx.wit.vtxinwit[i].vchInflationKeysRangeproof, tokenAsset.vchCommitment, CScript(), wtxid)) != SCRIPT_ERR_OK) {
                 return false;
             }
         } else if (!issuance.nInflationKeys.IsNull()) {
@@ -972,7 +991,7 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
         if (!ptxoutwit || ptxoutwit->vchRangeproof.size() > 5000) {
             return false;
         }
-        if (QueueCheck(pvChecks, new CRangeCheck(&val, ptxoutwit->vchRangeproof, vchAssetCommitment, tx.vout[i].scriptPubKey, wtxid, cacheStore)) != SCRIPT_ERR_OK) {
+        if (QueueCheck(pvChecks, new CRangeCheck(&val, ptxoutwit->vchRangeproof, vchAssetCommitment, tx.vout[i].scriptPubKey, wtxid)) != SCRIPT_ERR_OK) {
             return false;
         }
     }
@@ -997,7 +1016,7 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
         if (secp256k1_surjectionproof_parse(secp256k1_ctx_verify_amounts, &proof, &ptxoutwit->vchSurjectionproof[0], ptxoutwit->vchSurjectionproof.size()) != 1)
             return false;
 
-        if (QueueCheck(pvChecks, new CSurjectionCheck(proof, targetGenerators, gen, wtxid, cacheStore)) != SCRIPT_ERR_OK) {
+        if (QueueCheck(pvChecks, new CSurjectionCheck(proof, targetGenerators, gen, wtxid)) != SCRIPT_ERR_OK) {
             return false;
         }
     }
