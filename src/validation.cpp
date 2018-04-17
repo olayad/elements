@@ -597,10 +597,11 @@ private:
     // *Must* be a commitment, not an explicit value
     const std::vector<unsigned char> assetCommitment;
     const CScript scriptPubKey;
+    const uint256 wtxid;
     const bool store;
 
 public:
-    CRangeCheck(const CConfidentialValue* val_, const std::vector<unsigned char>& rangeproof_, const std::vector<unsigned char>& assetCommitment_, const CScript& scriptPubKey_, const bool storeIn) : val(val_), rangeproof(rangeproof_), assetCommitment(assetCommitment_), scriptPubKey(scriptPubKey_), store(storeIn) {}
+    CRangeCheck(const CConfidentialValue* val_, const std::vector<unsigned char>& rangeproof_, const std::vector<unsigned char>& assetCommitment_, const CScript& scriptPubKey_, const uint256& wtxid_, const bool storeIn) : val(val_), rangeproof(rangeproof_), assetCommitment(assetCommitment_), scriptPubKey(scriptPubKey_), wtxid(wtxid_), store(storeIn) {}
 
     bool operator()();
 };
@@ -655,7 +656,7 @@ bool CRangeCheck::operator()()
         return true;
     }
 
-    if (!CachingRangeProofChecker(store).VerifyRangeProof(rangeproof, val->vchCommitment, assetCommitment, scriptPubKey, secp256k1_ctx_verify_amounts)) {
+    if (!CachingRangeProofChecker(store).VerifyRangeProof(rangeproof, val->vchCommitment, assetCommitment, scriptPubKey, secp256k1_ctx_verify_amounts, wtxid)) {
         error = SCRIPT_ERR_RANGEPROOF;
         return false;
     }
@@ -712,6 +713,8 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
     unsigned char explBlinds[32];
     memset(explBlinds, 0, sizeof(explBlinds));
     int ret;
+
+    uint256 wtxid(tx.GetHashWithWitness());
 
     // This list is used to verify surjection proofs.
     // Proofs must be constructed with the list being in
@@ -842,7 +845,7 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
             p++;
 
             // Rangecheck must be done for blinded amount
-            if (issuance.nAmount.IsCommitment() && QueueCheck(pvChecks, new CRangeCheck(&issuance.nAmount, tx.wit.vtxinwit[i].vchIssuanceAmountRangeproof, issuanceAsset.vchCommitment, CScript(), cacheStore)) != SCRIPT_ERR_OK) {
+            if (issuance.nAmount.IsCommitment() && QueueCheck(pvChecks, new CRangeCheck(&issuance.nAmount, tx.wit.vtxinwit[i].vchIssuanceAmountRangeproof, issuanceAsset.vchCommitment, CScript(), wtxid, cacheStore)) != SCRIPT_ERR_OK) {
                 return false;
             }
         }
@@ -883,7 +886,7 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
             vpCommitsIn.push_back(p);
             p++;
 
-            if (issuance.nInflationKeys.IsCommitment() && QueueCheck(pvChecks, new CRangeCheck(&issuance.nInflationKeys, tx.wit.vtxinwit[i].vchInflationKeysRangeproof, tokenAsset.vchCommitment, CScript(), cacheStore)) != SCRIPT_ERR_OK) {
+            if (issuance.nInflationKeys.IsCommitment() && QueueCheck(pvChecks, new CRangeCheck(&issuance.nInflationKeys, tx.wit.vtxinwit[i].vchInflationKeysRangeproof, tokenAsset.vchCommitment, CScript(), wtxid, cacheStore)) != SCRIPT_ERR_OK) {
                 return false;
             }
         } else if (!issuance.nInflationKeys.IsNull()) {
@@ -968,7 +971,7 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
         if (!ptxoutwit || ptxoutwit->vchRangeproof.size() > 5000) {
             return false;
         }
-        if (QueueCheck(pvChecks, new CRangeCheck(&val, ptxoutwit->vchRangeproof, vchAssetCommitment, tx.vout[i].scriptPubKey, cacheStore)) != SCRIPT_ERR_OK) {
+        if (QueueCheck(pvChecks, new CRangeCheck(&val, ptxoutwit->vchRangeproof, vchAssetCommitment, tx.vout[i].scriptPubKey, wtxid, cacheStore)) != SCRIPT_ERR_OK) {
             return false;
         }
     }

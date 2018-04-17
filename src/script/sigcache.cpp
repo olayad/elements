@@ -63,6 +63,11 @@ public:
         CSHA256().Write(nonce.begin(), 32).Write(hash.begin(), 32).Write(&pubkey[0], pubkey.size()).Write(&vchSig[0], vchSig.size()).Write(&vchCommitment[0], vchCommitment.size()).Write(&scriptPubKey[0], scriptPubKey.size()).Finalize(entry.begin());
     }
 
+    void ComputeEntry(uint256& entry, const uint256& wtxid, const std::vector<unsigned char>& commitment)
+    {
+        CSHA256().Write(nonce.begin(), 32).Write(wtxid.begin(), 32).Write(commitment.data(), 32).Finalize(entry.begin());
+    }
+
     bool
     Get(const uint256& entry, const bool erase)
     {
@@ -143,13 +148,13 @@ bool CachingTransactionSignatureChecker::VerifySignature(const std::vector<unsig
     return true;
 }
 
-bool CachingRangeProofChecker::VerifyRangeProof(const std::vector<unsigned char>& vchRangeProof, const std::vector<unsigned char>& vchValueCommitment, const std::vector<unsigned char>& vchAssetCommitment, const CScript& scriptPubKey, const secp256k1_context* secp256k1_ctx_verify_amounts) const
+bool CachingRangeProofChecker::VerifyRangeProof(const std::vector<unsigned char>& vchRangeProof, const std::vector<unsigned char>& vchValueCommitment, const std::vector<unsigned char>& vchAssetCommitment, const CScript& scriptPubKey, const secp256k1_context* secp256k1_ctx_verify_amounts, const uint256& wtxid) const
 {
-    CPubKey pubkey(vchValueCommitment);
     uint256 entry;
-    rangeProofCache.ComputeEntry(entry, uint256(), vchRangeProof, pubkey, vchAssetCommitment, scriptPubKey);
+    // wtxid commits to all witness data, value commitment is checked against rangeproof witness
+    rangeProofCache.ComputeEntry(entry, wtxid, vchValueCommitment);
 
-    if (rangeProofCache.Get(entry, !store)) {
+    if (rangeProofCache.Get(wtxid, !store)) {
         return true;
     }
 
