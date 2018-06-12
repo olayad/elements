@@ -2361,23 +2361,28 @@ CScript calculate_contract(const CScript& federationRedeemScript, const CScript&
 
 bool IsValidPeginWitness(const CScriptWitness& pegin_witness, const COutPoint& prevout, bool check_depth) {
 
+    const std::vector<std::vector<unsigned char> >& stack = pegin_witness.stack;
+    // Must include all elements
+    if (stack.size() != 7) {
+        return false;
+    }
+//TODO reference all these fields here, and refer back to these the rest of the time for readability
     // Format on stack is as follows:
     // 1) value - the value of the pegin output
     // 2) asset type - the asset type being pegged in
     // 3) genesis blockhash - genesis block of the parent chain
     // 4) claim script - script to be evaluated for spend authorization
     // 5) serialized transaction - serialized bitcoin transaction
-    // 6) txout proof - merkle proof connecting transaction to header
+    // 6) One of two things:
+    //  - If <=64 bytes: The serialized coinbase transaction. Extremely unlikely
+    //  but possible.
+    //  - If >64 bytes, it is interpreted as: serialized coinbase first image - single-SHA2 of coinbase transaction and the bitlength of the serialized transaction
+    //  - This is to mitigate CVE-2017-12842 without undue resource usage
+    // 7) txout proof - merkle proof connecting transaction to header
     //
     // First 4 values(plus prevout) are enough to validate a peg-in without any internal knowledge
     // of Bitcoin serialization. This is useful for further abstraction by outsourcing
     // the other validity checks to RPC calls.
-
-    const std::vector<std::vector<unsigned char> >& stack = pegin_witness.stack;
-    // Must include all elements
-    if (stack.size() != 6) {
-        return false;
-    }
 
     CDataStream stream(stack[0], SER_NETWORK, PROTOCOL_VERSION);
     CAmount value;
@@ -2422,18 +2427,52 @@ bool IsValidPeginWitness(const CScriptWitness& pegin_witness, const COutPoint& p
         return false;
     }
 
+    uint256 calculated_coinbase_hash;
+    if (stack[5].size() <= 64) {
+        // A coinbase transaction
+        // We must check that it's a valid coinbase transaction by checking the previn field
+
+        // Get serialized transaction
+        try {
+            Sidechain::Bitcoin::CTransactionRef coinbase_tx;
+            CDataStream pegtx_stream(stack[5], SER_NETWORK, PROTOCOL_VERSION);
+            pegtx_stream >> coinbasetx;
+            if (!pegtx_stream.empty() || !coinbase_tx->IsCoinBase()) {
+                return false;
+            }
+            calculated_coinbase_hash = coinbase_tx.GetHash();
+        } catch (std::exception& e) {
+            // Invalid encoding of transaction
+            return false;
+        }
+
+    } else if (stack[5].size() == 65) {
+        // Interpret as the the midstate of the first SHA2 of the coinbase transaction
+        calculated_coinbase_hash = uint256() //TODO get exact calculation
+    } else {
+        return false;
+    }
+
     // Get txout proof
     Sidechain::Bitcoin::CMerkleBlock merkle_block;
     std::vector<uint256> txHashes;
     std::vector<unsigned int> txIndices;
 
     try {
-        CDataStream merkleBlockStream(stack[5], SER_NETWORK, PROTOCOL_VERSION);
+        CDataStream merkleBlockStream(stack[6], SER_NETWORK, PROTOCOL_VERSION);
         merkleBlockStream >> merkle_block;
         if (!merkleBlockStream.empty() || !CheckBitcoinProof(merkle_block.header.GetHash(), merkle_block.header.nBits)) {
            return false;
         }
-        if (merkle_block.txn.ExtractMatches(txHashes, txIndices) != merkle_block.header.hashMerkleRoot || txHashes.size() != 1) {
+        // TODO validate what extract matches is checking. I presume it would only return
+        // success when all matches are at same level
+        // Proof must contain up to two transactions: the peg-in transaction itself and
+        // the coinbase transaction in the block.
+        if (merkle_block.txn.ExtractMatches(txHashes, txIndices) != merkle_block.header.hashMerkleRoot) {
+            return false;
+        }
+        // Must be two transactions, and first being the coinbase
+        if (txHashes.size() != 2 || txIndices.front() != 0) {
             return false;
         }
     } catch (std::exception& e) {
@@ -2446,8 +2485,13 @@ bool IsValidPeginWitness(const CScriptWitness& pegin_witness, const COutPoint& p
         return false;
     }
 
+    // Check the coinbase given matches
+    if (calculated_coinbase_hash != txHashes.front()) {
+        return false;
+    }
+
     // Check that the merkle proof corresponds to the txid
-    if (prevout.hash != txHashes[0]) {
+    if (prevout.hash != txHashes.back()) {
         return false;
     }
 
