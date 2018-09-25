@@ -147,7 +147,7 @@ class FedPegTest(BitcoinTestFramework):
 
         # Should fail due to non-witness
         try:
-            pegtxid = sidechain.claimpegin(raw, proof, get_new_unconfidential_address(parent))
+            pegtxid = sidechain.claimpegin(raw, proof, get_new_unconfidential_address(sidechain))
             raise Exception("Peg-in with non-matching claim_script should fail.")
         except JSONRPCException as e:
             print(e.error["message"])
