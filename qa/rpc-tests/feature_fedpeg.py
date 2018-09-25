@@ -17,6 +17,8 @@ from test_framework.util import (
     stop_node,
 )
 
+fedpeg_script="512103dff4923d778550cc13ce0d887d737553b4b58f4e8e886507fc39f5e447b2186451ae"
+
 # Sync mempool, make a block, sync blocks
 def sync_all(sidechain, sidechain2, makeblock=True):
     block = ""
@@ -63,7 +65,7 @@ class FedPegTest(BitcoinTestFramework):
 
     def setup_network(self, split=False):
         if self.options.parent_bitcoin and self.options.parent_binpath == "":
-            raise "Can't run with --parent_bitcoin without specifying --parent_binpath"
+            raise Exception("Can't run with --parent_bitcoin without specifying --parent_binpath")
 
         self.nodes = []
         self.extra_args = []
@@ -107,6 +109,7 @@ class FedPegTest(BitcoinTestFramework):
                 # '-printtoconsole',
                 '-parentgenesisblockhash=%s' % self.parentgenesisblockhash,
                 '-validatepegin=1',
+                '-fedpegscript='+fedpeg_script,
                 '-anyonecanspendaremine=0',
                 '-initialfreecoins=0',
                 '-peginconfirmationdepth=10',
@@ -186,21 +189,13 @@ class FedPegTest(BitcoinTestFramework):
             print('ERROR:', e.error)
             assert("Peg-in Bitcoin transaction needs more confirmations to be sent." in e.error["message"])
 
-        # Should fail due to non-witness
+        # Should fail due to non-matching wallet address
         try:
-            pegtxid = sidechain.claimpegin(raw, proof, get_new_unconfidential_address(sidechain))
+            pegtxid = sidechain.claimpegin(raw, proof, sidechain.validateaddress(get_new_unconfidential_address(sidechain))["scriptPubKey"])
             raise Exception("Peg-in with non-matching claim_script should fail.")
         except JSONRPCException as e:
-            print('ERROR:', e.error)
-            assert("Given or recovered script is not a witness program." in e.error["message"])
-
-        # # Should fail due to non-matching wallet address
-        # try:
-        #     pegtxid = sidechain.claimpegin(raw, proof, get_new_unconfidential_address(sidechain))
-        #     raise Exception("Peg-in with non-matching claim_script should fail.")
-        # except JSONRPCException as e:
-        #     print(e.error["message"])
-        #     assert("Given claim_script does not match the given Bitcoin transaction." in e.error["message"])
+            print(e.error["message"])
+            assert("Given claim_script does not match the given Bitcoin transaction." in e.error["message"])
 
         # 12 confirms allows in mempool
         parent.generate(1)
