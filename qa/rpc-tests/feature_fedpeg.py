@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from decimal import Decimal
+import os
 import json
 import time
 
@@ -10,6 +11,7 @@ from test_framework.util import (
     connect_nodes_bi,
     rpc_auth_pair,
     rpc_port,
+    p2p_port,
     start_node,
     start_nodes,
     stop_node,
@@ -47,27 +49,61 @@ class FedPegTest(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.num_nodes = 4
 
+    def add_options(self, parser):
+        parser.add_option("--parent_binpath", dest="parent_binpath", default="",
+                          help="Use a different binary for launching nodes")
+        parser.add_option("--parent_bitcoin", dest="parent_bitcoin", default=False, action="store_true",
+                          help="Parent nodes are Bitcoin")
+
+    def start_node(self, idx):
+        is_parent = idx < 2
+        binary = self.options.parent_binpath if is_parent and self.options.parent_binpath != "" else None
+        chain = "sidechain" if not is_parent else "regtest" if self.options.parent_bitcoin else "parent"
+        return start_node(idx, self.options.tmpdir, self.extra_args[idx], binary=binary, chain=chain)
+
     def setup_network(self, split=False):
+        if self.options.parent_bitcoin and self.options.parent_binpath == "":
+            raise "Can't run with --parent_bitcoin without specifying --parent_binpath"
 
+        self.nodes = []
+        self.extra_args = []
         # Parent chain args
-        self.extra_args = [[
-            # '-printtoconsole',
-            '-validatepegin=0',
-            '-anyonecanspendaremine',
-            '-initialfreecoins=2100000000000000',
-        ]] * 2
+        for n in range(2):
+            if self.options.parent_bitcoin:
+                rpc_u, rpc_p = rpc_auth_pair(n)
+                self.extra_args.append([
+                    "-regtest=1",
+                    "-port="+str(p2p_port(n)),
+                    "-rpcuser="+rpc_u,
+                    "-rpcpassword="+rpc_p,
+                    "-rpcport="+str(rpc_port(n)),
+                    "-testnet=0",
+                    "-txindex=1",
+                    "-addresstype=legacy", # To make sure bitcoind gives back p2pkh no matter version
+                    "-connect=localhost:"+str(p2p_port((n+1)%2)),
+                    "-listen=1",
+                    #"-debug"
+                ])
+            else:
+                self.extra_args.append([
+                    # '-printtoconsole',
+                    '-validatepegin=0',
+                    '-anyonecanspendaremine',
+                    '-initialfreecoins=2100000000000000',
+                ])
+            self.nodes.append(self.start_node(n))
 
-        self.nodes = start_nodes(2, self.options.tmpdir, self.extra_args[:2], chain='parent')
         connect_nodes_bi(self.nodes, 0, 1)
         self.parentgenesisblockhash = self.nodes[0].getblockhash(0)
         print('parentgenesisblockhash', self.parentgenesisblockhash)
-        parent_pegged_asset = self.nodes[0].getsidechaininfo()['pegged_asset']
+        if not self.options.parent_bitcoin:
+            parent_pegged_asset = self.nodes[0].getsidechaininfo()['pegged_asset']
 
         # Sidechain args
         parent_chain_signblockscript = '51'
         for n in range(2):
             rpc_u, rpc_p = rpc_auth_pair(n)
-            self.extra_args.append([
+            args = [
                 # '-printtoconsole',
                 '-parentgenesisblockhash=%s' % self.parentgenesisblockhash,
                 '-validatepegin=1',
@@ -78,12 +114,16 @@ class FedPegTest(BitcoinTestFramework):
                 '-mainchainrpcport=%s' % rpc_port(n),
                 '-mainchainrpcuser=%s' % rpc_u,
                 '-mainchainrpcpassword=%s' % rpc_p,
-                '-parentpubkeyprefix=235',
-                '-parentscriptprefix=75',
-                '-con_parent_chain_signblockscript=%s' % parent_chain_signblockscript,
-                '-con_parent_pegged_asset=%s' % parent_pegged_asset,
-            ])
-            self.nodes.append(start_node(n + 2, self.options.tmpdir, self.extra_args[n + 2], chain='sidechain'))
+            ]
+            if not self.options.parent_bitcoin:
+                args.extend([
+                    '-parentpubkeyprefix=235',
+                    '-parentscriptprefix=75',
+                    '-con_parent_chain_signblockscript=%s' % parent_chain_signblockscript,
+                    '-con_parent_pegged_asset=%s' % parent_pegged_asset,
+                ])
+            self.extra_args.append(args)
+            self.nodes.append(self.start_node(2 + n))
 
         connect_nodes_bi(self.nodes, 2, 3)
         self.is_network_split = True
@@ -281,7 +321,7 @@ class FedPegTest(BitcoinTestFramework):
         assert(sidechain.getblockcount() != sidechain2.getblockcount())
 
         print("Restarting parent2")
-        self.nodes[1] = start_node(1, self.options.tmpdir, self.extra_args[1], chain='parent')
+        self.nodes[1] = self.start_node(1)
         parent2 = self.nodes[1]
         connect_nodes_bi(self.nodes, 0, 1)
         time.sleep(5)
