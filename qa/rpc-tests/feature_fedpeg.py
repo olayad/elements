@@ -156,10 +156,10 @@ class FedPegTest(BitcoinTestFramework):
         sidechain.generate(101)
 
         addrs = sidechain.getpeginaddress()
-        addr = parent.validateaddress(addrs["mainchain_address"])
+        addr = addrs["mainchain_address"]
         print('addrs', addrs)
-        print('addr', addr)
-        txid1 = parent.sendtoaddress(addrs["mainchain_address"], 24)
+        print(parent.validateaddress(addr))
+        txid1 = parent.sendtoaddress(addr, 24)
         # 10+2 confirms required to get into mempool and confirm
         parent.generate(1)
         time.sleep(2)
@@ -183,6 +183,7 @@ class FedPegTest(BitcoinTestFramework):
             pegtxid = sidechain.claimpegin(raw, proof)
             raise Exception("Peg-in should not be mature enough yet, need another block.")
         except JSONRPCException as e:
+            print('ERROR:', e.error)
             assert("Peg-in Bitcoin transaction needs more confirmations to be sent." in e.error["message"])
 
         # Should fail due to non-witness
@@ -190,7 +191,7 @@ class FedPegTest(BitcoinTestFramework):
             pegtxid = sidechain.claimpegin(raw, proof, get_new_unconfidential_address(sidechain))
             raise Exception("Peg-in with non-matching claim_script should fail.")
         except JSONRPCException as e:
-            print(e.error["message"])
+            print('ERROR:', e.error)
             assert("Given or recovered script is not a witness program." in e.error["message"])
 
         # # Should fail due to non-matching wallet address
@@ -309,7 +310,7 @@ class FedPegTest(BitcoinTestFramework):
 
         print ("Now test failure to validate peg-ins based on intermittant bitcoind rpc failure")
         stop_node(self.nodes[1], 1)
-        txid = parent.sendtoaddress(addrs["mainchain_address"], 1)
+        txid = parent.sendtoaddress(addr, 1)
         parent.generate(12)
         proof = parent.gettxoutproof([txid])
         raw = parent.getrawtransaction(txid)
