@@ -83,6 +83,9 @@ struct Params {
     CAmount genesis_subsidy;
     bool connect_genesis_outputs;
     // g_con_blockheightinheader global hack instead of proper arg due to circular dep
+    CScript signblockscript;
+    uint32_t max_block_signature_size;
+    // g_signed_blocks - Whether blocks are signed or not, get around circular dep
 };
 } // namespace Consensus
 

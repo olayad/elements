@@ -96,8 +96,9 @@ void BlockAssembler::resetBlock()
     nFees = 0;
 }
 
-std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, bool fMineWitnessTx)
+std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, bool fMineWitnessTx, int required_age_in_secs)
 {
+    assert(required_age_in_secs >= 0);
     int64_t nTimeStart = GetTimeMicros();
 
     resetBlock();
@@ -142,9 +143,18 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     // transaction (which in most cases can be a no-op).
     fIncludeWitness = IsWitnessEnabled(pindexPrev, chainparams.GetConsensus()) && fMineWitnessTx;
 
+    if (g_signed_blocks) {
+        // Pad block weight by block proof fields (including upper-bound of signature)
+        nBlockWeight += chainparams.GetConsensus().signblockscript.size() * WITNESS_SCALE_FACTOR;
+        nBlockWeight += chainparams.GetConsensus().max_block_signature_size * WITNESS_SCALE_FACTOR;
+        // Reset block proof
+        ResetProof(*pblock);
+        ResetChallenge(*pblock, *pindexPrev, chainparams.GetConsensus());
+    }
+
     int nPackagesSelected = 0;
     int nDescendantsUpdated = 0;
-    addPackageTxs(nPackagesSelected, nDescendantsUpdated);
+    addPackageTxs(nPackagesSelected, nDescendantsUpdated, required_age_in_secs);
 
     int64_t nTime1 = GetTimeMicros();
 
@@ -168,10 +178,10 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     // Fill in header
     pblock->hashPrevBlock  = pindexPrev->GetBlockHash();
     UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
+    pblock->nBits          = g_signed_blocks ? 0 : GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
     if (g_con_blockheightinheader) {
         pblock->block_height = nHeight;
     }
-    pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
     pblock->nNonce         = 0;
     pblocktemplate->vTxSigOpsCost[0] = WITNESS_SCALE_FACTOR * GetLegacySigOpCount(*pblock->vtx[0]);
 
@@ -306,7 +316,7 @@ void BlockAssembler::SortForBlock(const CTxMemPool::setEntries& package, std::ve
 // Each time through the loop, we compare the best transaction in
 // mapModifiedTxs with the next transaction in the mempool to decide what
 // transaction package to work on next.
-void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpdated)
+void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpdated, int required_age_in_secs)
 {
     // mapModifiedTx will store sorted packages after they are modified
     // because some of their txs are already in the block
@@ -360,6 +370,12 @@ void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpda
                 // Increment mi for the next loop iteration.
                 ++mi;
             }
+        }
+
+        // Skip transactions that are under X seconds in mempool
+        // required_age_in_secs value of 0 is considered "inactive", in case of mocktime
+        if (required_age_in_secs > 0 && iter->GetTime() > GetTime() - required_age_in_secs) {
+            continue;
         }
 
         // We skip mapTx entries that are inBlock, and mapModifiedTx shouldn't

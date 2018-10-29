@@ -213,6 +213,7 @@ public:
     uint32_t block_height;
     uint32_t nBits;
     uint32_t nNonce;
+    CProof proof;
 
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     int32_t nSequenceId;
@@ -242,6 +243,7 @@ public:
         block_height   = 0;
         nBits          = 0;
         nNonce         = 0;
+        proof.SetNull();
     }
 
     CBlockIndex()
@@ -259,6 +261,7 @@ public:
         block_height   = block.block_height;
         nBits          = block.nBits;
         nNonce         = block.nNonce;
+        proof          = block.proof;
     }
 
     CDiskBlockPos GetBlockPos() const {
@@ -290,6 +293,7 @@ public:
         block.block_height   = block_height;
         block.nBits          = nBits;
         block.nNonce         = nNonce;
+        block.proof          = proof;
         return block;
     }
 
@@ -410,6 +414,7 @@ public:
         READWRITE(block_height);
         READWRITE(nBits);
         READWRITE(nNonce);
+        READWRITE(proof);
     }
 
     uint256 GetBlockHash() const
@@ -422,6 +427,7 @@ public:
         block.block_height    = block_height;
         block.nBits           = nBits;
         block.nNonce          = nNonce;
+        block.proof           = proof;
         return block.GetHash();
     }
 
