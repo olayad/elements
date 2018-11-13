@@ -295,6 +295,15 @@ public:
         *script << CScript::EncodeOP_N(id.version) << std::vector<unsigned char>(id.program, id.program + id.length);
         return true;
     }
+
+    bool operator()(const NullData& id) const
+    {
+        script->clear();
+        for (const auto& push : id.null_data) {
+            *script << push;
+        }
+        return true;
+    }
 };
 } // namespace
 

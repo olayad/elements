@@ -4110,6 +4110,12 @@ public:
         return obj;
     }
 
+    // No address format
+    UniValue operator()(const NullData& id) const
+    {
+        return NullUniValue;
+    }
+
     UniValue operator()(const WitnessUnknown& id) const { return UniValue(UniValue::VOBJ); }
 };
 
