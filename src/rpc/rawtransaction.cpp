@@ -1579,6 +1579,72 @@ UniValue sendrawtransaction(const JSONRPCRequest& request)
     return hashTx.GetHex();
 }
 
+// Appends a single reissuance to the first input that matches the underlying reissuance
+// asset type, and includes a single output in a shuffled position.
+bool reissueasset_base(CMutableTransaction& mtx, const CAmount asset_amount, const std::string& asset_address_str, const std::string& contract_str, const CAssetID asset_id, const CAssetID token_id, const uint256& token_asset_blind, const size_t reissuance_input_index)
+{
+
+    CBitcoinAddress asset_address(asset_address_str);
+    CScript asset_destination = GetScriptForDestination(asset_address.Get());
+
+
+    uint256 contract_hash;
+    // Hash in a contract string if non-empty
+    if (!contract_str.empty()) {
+        std::vector<unsigned char> contract_bytes = ParseHex(contract_str);
+        std::vector<unsigned char> contract_hash_bytes;
+        contract_hash_bytes.resize(32);
+        CSHA256().Write(contract_bytes.data(), contract_bytes.size()).Finalize(contract_hash_bytes.data());
+        contract_hash = uint256(contract_hash_bytes);
+    }
+
+    // Error if issuance already exists for that input
+    if (mtx.vin[reissuance_input_index].assetIssuance.IsNull()) {
+        return false;
+    }
+
+    uint256 entropy;
+    CAsset asset;
+    CAsset token;
+    GenerateAssetEntropy(entropy, mtx.vin[reissuance_input_index].prevout, contract_hash);
+    CalculateAsset(asset, entropy);
+    CalculateReissuanceToken(token, entropy, blind_issuance);
+
+    mtx.vin[issuance_input_index].assetIssuance.assetEntropy = contract_hash;
+
+    // Place assets into randomly placed output slots, just insert in place
+    int asset_place = GetRandInt(mtx.vout.size());
+    int token_place = GetRandInt(mtx.vout.size()+1); // Don't bias insertion
+
+    CTxOut asset_out(asset, asset_amount, asset_destination);
+    // If blinded address, insert the pubkey into the nonce field for later substitution by blinding
+    if (asset_address.IsBlinded()) {
+        CPubKey asset_blind = asset_address.GetBlindingKey();
+        asset_out.nNonce.vchCommitment = std::vector<unsigned char>(asset_blind.begin(), asset_blind.end());
+    }
+    // Don't issue stuff or set values unless non-zero (both are against consensus)
+    if (asset_amount > 0) {
+        mtx.vout.insert(mtx.vout.begin()+asset_place, asset_out);
+        mtx.vin[issuance_input_index].assetIssuance.nAmount = asset_amount;
+    }
+
+    CTxOut token_out(token, token_amount, token_destination);
+    // If blinded address, insert the pubkey into the nonce field for later substitution by blinding
+    if (token_address.IsBlinded()) {
+        CPubKey token_blind = token_address.GetBlindingKey();
+        token_out.nNonce.vchCommitment = std::vector<unsigned char>(token_blind.begin(), token_blind.end());
+    }
+    // Don't issue stuff or set values unless non-zero (both are against consensus)
+    if (token_amount > 0) {
+        mtx.vout.insert(mtx.vout.begin()+token_place, token_out);
+        mtx.vin[issuance_input_index].assetIssuance.nInflationKeys = token_amount;
+    }
+
+    // We think we succeeded
+    return true;
+}
+
+
 // Appends a single issuance to the first input that doesn't have one, and includes
 // a single output per asset type in shuffled positions.
 bool issueasset_base(CMutableTransaction& mtx, const CAmount asset_amount, const CAmount token_amount, const std::string& asset_address_str, const std::string& token_address_str, const bool blind_issuance, const std::string& contract_str)
