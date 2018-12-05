@@ -443,6 +443,13 @@ class CCustomParams : public CRegTestParams {
         std::vector<unsigned char> man_bytes = ParseHex(gArgs.GetArg("-con_mandatorycoinbase", ""));
         consensus.mandatory_coinbase_destination = CScript(man_bytes.begin(), man_bytes.end()); // Blank script allows any coinbase destination
 
+        // Block signing encumberance script, default of 51 aka OP_TRUE
+        std::vector<unsigned char> sign_bytes = ParseHex(gArgs.GetArg("-signblockscript", "51"));
+        consensus.signblockscript = CScript(sign_bytes.begin(), sign_bytes.end());
+        // Default signature size is the size of dummy push, and single 72 byte DER signature
+        consensus.max_block_signature_size = gArgs.GetArg("-con_max_block_sig_size", 74);
+        g_signed_blocks = gArgs.GetBoolArg("-con_signed_blocks", true);
+
         // Custom chains connect coinbase outputs to db by default
         consensus.connect_genesis_outputs = gArgs.GetArg("-con_connect_coinbase", true);
 
