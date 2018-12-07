@@ -448,7 +448,7 @@ class CCustomParams : public CRegTestParams {
         consensus.signblockscript = CScript(sign_bytes.begin(), sign_bytes.end());
         // Default signature size is the size of dummy push, and single 72 byte DER signature
         consensus.max_block_signature_size = gArgs.GetArg("-con_max_block_sig_size", 74);
-        g_signed_blocks = gArgs.GetBoolArg("-con_signed_blocks", true);
+        g_signed_blocks = gArgs.GetBoolArg("-con_signed_blocks", false);
 
         // Custom chains connect coinbase outputs to db by default
         consensus.connect_genesis_outputs = gArgs.GetArg("-con_connect_coinbase", true);
