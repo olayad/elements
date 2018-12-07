@@ -412,9 +412,13 @@ public:
         READWRITE(hashMerkleRoot);
         READWRITE(nTime);
         READWRITE(block_height);
-        READWRITE(nBits);
-        READWRITE(nNonce);
-        READWRITE(proof);
+        // For compatibility with elements 0.14 based chains
+        if (g_signed_blocks) {
+            READWRITE(proof);
+        } else {
+            READWRITE(nBits);
+            READWRITE(nNonce);
+        }
     }
 
     uint256 GetBlockHash() const
