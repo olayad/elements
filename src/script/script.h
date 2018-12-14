@@ -550,6 +550,14 @@ public:
     // the genesis hash matches the specified one.
     bool IsPegoutScript(const uint256& genesis_hash) const;
 
+	/**
+     * Returns true if the script includes valid pegout proof
+     * given the PAK list loaded. Two pushes after regular pegout script:
+     * <full_pubkey> <proof>
+     */
+    bool HasValidPAKProof(const uint256& genesis_hash) const;
+
+
     /** Called by IsStandardTx and P2SH/BIP62 VerifyScript (which makes it consensus-critical). */
     bool IsPushOnly(const_iterator pc) const;
     bool IsPushOnly() const;

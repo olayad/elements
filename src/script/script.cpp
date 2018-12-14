@@ -234,6 +234,102 @@ bool CScript::IsPegoutScript(const uint256& genesis_hash_check) const
     return false;
 }
 
+namespace {
+static secp256k1_context *secp256k1_ctx_ver;
+
+class CSecp256k1Init {
+public:
+    CSecp256k1Init() {
+        secp256k1_ctx_ver = secp256k1_context_create(SECP256K1_CONTEXT_VERIFY);
+    }
+    ~CSecp256k1Init() {
+        secp256k1_context_destroy(secp256k1_ctx_ver);
+    }
+};
+static CSecp256k1Init instance_of_csecp256k1_ver;
+}
+
+// Proof follows the OP_RETURN <genesis_block_hash> <destination_scriptpubkey>
+// in multiple pushes: <full_pubkey> <proof>
+bool CScript::HasValidPAKProof(const uint256& genesis_hash) const
+{
+    assert(IsPegoutScript(genesis_hash));
+
+    CPAKList paklist;
+    if (g_paklist_config) {
+        paklist = *g_paklist_config;
+    } else {
+        paklist = g_paklist_blockchain;
+    }
+
+    if (paklist.IsReject() || paklist.IsEmpty()) {
+        return false;
+    }
+
+    const_iterator pc = begin();
+    std::vector<unsigned char> data;
+    opcodetype opcode;
+
+    GetOp(pc, opcode, data);
+    GetOp(pc, opcode, data);
+    GetOp(pc, opcode, data);
+
+    CScript destination(data.begin(), data.end());
+
+    // Only accept p2pkh
+    if (!destination.IsPayToPubkeyHash()) {
+        return false;
+    }
+
+    // Grab pubkey hash within the extracted sub-script
+    const_iterator pc2 = destination.begin();
+    std::vector<unsigned char> data2;
+    opcodetype opcode2;
+    if (!destination.GetOp(pc2, opcode2, data2) || !destination.GetOp(pc2, opcode2, data2) ||!destination.GetOp(pc2, opcode2, data2)) {
+        return false;
+    }
+
+    // Follow-up with full pubkey
+    if (!GetOp(pc, opcode, data) || opcode != 33 || data.size() != 33) {
+        return false;
+    }
+
+    CPubKey cpubkey(data.begin(), data.end());
+    //Ensure the chaindest p2pkh matches the included pubkey
+    if (cpubkey.GetID() != uint160(data2))
+        return false;
+
+    // Parse pubkey
+    secp256k1_pubkey pubkey;
+    if (secp256k1_ec_pubkey_parse(secp256k1_ctx_ver, &pubkey, &data[0], data.size()) != 1)
+        return false;
+
+    if (!GetOp(pc, opcode, data) || opcode > OP_PUSHDATA4 || data.size() == 0) {
+        return false;
+    }
+
+    // Prase whitelist proof
+    secp256k1_whitelist_signature sig;
+    if (secp256k1_whitelist_signature_parse(secp256k1_ctx_ver, &sig, &data[0], data.size()) != 1)
+        return false;
+
+    if (secp256k1_whitelist_signature_n_keys(&sig) != paklist.size()) {
+        return false;
+    }
+
+    if (secp256k1_whitelist_verify(secp256k1_ctx_ver, &sig, &paklist.OnlineKeys()[0], &paklist.OfflineKeys()[0], paklist.size(), &pubkey) != 1) {
+        return false;
+    }
+
+    //No more pushes allowed
+    if (GetOp(pc, opcode, data)) {
+        return false;
+    }
+
+    return true;
+}
+
+
 // END ELEMENTS
 //
 
