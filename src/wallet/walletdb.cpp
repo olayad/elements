@@ -527,6 +527,7 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
                 strErr = "Error reading wallet database: Unknown non-tolerable wallet flags found";
                 return false;
             }
+        }
         else if (strType == "onlinekey")
         {
             CPubKey key;
