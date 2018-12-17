@@ -11,7 +11,7 @@
 #include <serialize.h>
 #include <uint256.h>
 
-#include "secp256k1/include/secp256k1_whitelist.h"
+#include <secp256k1/include/secp256k1_whitelist.h>
 
 class CPAKList
 {
