@@ -11,6 +11,9 @@
 #include <secp256k1/include/secp256k1_whitelist.h>
 #include <primitives/block.h>
 
+#include <util.h> // g_paklist_*
+#include <pubkey.h>
+
 const char* GetOpName(opcodetype opcode)
 {
     switch (opcode)
