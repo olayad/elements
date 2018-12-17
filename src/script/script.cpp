@@ -332,6 +332,16 @@ bool CScript::HasValidPAKProof(const uint256& genesis_hash) const
     return true;
 }
 
+bool CScript::IsPayToPubkeyHash() const
+{
+    // Extra-fast test for pay-to-pubkey-hash CScripts:
+    return (this->size() == 25 &&
+            (*this)[0] == OP_DUP &&
+            (*this)[1] == OP_HASH160 &&
+            (*this)[2] == 0x14 &&
+            (*this)[23] == OP_EQUALVERIFY &&
+            (*this)[24] == OP_CHECKSIG);
+}
 
 // END ELEMENTS
 //
