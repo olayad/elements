@@ -88,6 +88,14 @@ ArgsManager gArgs;
 
 CTranslationInterface translationInterface;
 
+// PAK entries loaded by config file entries
+// These will be embedded into coinbase transaction
+//  during block creation and tested against during
+//  testproposedblock
+boost::optional<CPAKList> g_paklist_config;
+// PAK entries loaded from latest coinbase pak commitment
+CPAKList g_paklist_blockchain;
+
 /** Init OpenSSL library multithreading support */
 static std::unique_ptr<CCriticalSection[]> ppmutexOpenSSL;
 void locking_callback(int mode, int i, const char* file, int line) NO_THREAD_SAFETY_ANALYSIS

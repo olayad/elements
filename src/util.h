@@ -34,6 +34,8 @@
 #include <boost/signals2/signal.hpp>
 #include <boost/thread/condition_variable.hpp> // for boost::thread_interrupted
 
+#include <primitives/block.h> // CPAKList
+
 // Application startup time (used for uptime calculation)
 int64_t GetStartupTime();
 
@@ -49,6 +51,9 @@ extern CTranslationInterface translationInterface;
 
 extern const char * const BITCOIN_CONF_FILENAME;
 extern const char * const BITCOIN_PID_FILENAME;
+
+extern boost::optional<CPAKList> g_paklist_config;
+extern CPAKList g_paklist_blockchain;
 
 /**
  * Translation function: Call Translate signal on UI interface, which returns a boost::optional result.
