@@ -62,6 +62,7 @@ bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType)
     if (!Solver(scriptPubKey, whichType, vSolutions))
         return false;
 
+    CChainParams params = Params();
     if (whichType == TX_MULTISIG)
     {
         unsigned char m = vSolutions.front()[0];
@@ -71,7 +72,11 @@ bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType)
             return false;
         if (m < 1 || m > n)
             return false;
-    } else if (whichType == TX_NULL_DATA && !scriptPubKey.IsPegoutScript(Params().ParentGenesisBlockHash()) &&
+    } else if (whichType == TX_NULL_DATA && params.GetEnforcePak() &&
+            scriptPubKey.IsPegoutScript(Params().ParentGenesisBlockHash()) ) {
+        // If we're enforcing pak let through larger peg-out scripts
+        return true;
+    } else if (whichType == TX_NULL_DATA &&
                (!fAcceptDatacarrier || scriptPubKey.size() > nMaxDatacarrierBytes))
           return false;
 
@@ -114,6 +119,8 @@ bool IsStandardTx(const CTransaction& tx, std::string& reason)
         }
     }
 
+    CChainParams params = Params();
+    unsigned int nDataOut = 0;
     txnouttype whichType;
     for (const CTxOut& txout : tx.vout) {
         if (!::IsStandard(txout.scriptPubKey, whichType)) {
@@ -122,8 +129,11 @@ bool IsStandardTx(const CTransaction& tx, std::string& reason)
         }
 
         if (whichType == TX_NULL_DATA) {
-            if (txout.scriptPubKey.IsPegoutScript(Params().ParentGenesisBlockHash()) &&
-                (!txout.scriptPubKey.HasValidPAKProof(Params().ParentGenesisBlockHash()))) {
+            nDataOut++;
+        }
+        if (whichType == TX_NULL_DATA && params.GetEnforcePak()) {
+            if (txout.scriptPubKey.IsPegoutScript(params.ParentGenesisBlockHash()) &&
+                (!txout.scriptPubKey.HasValidPAKProof(params.ParentGenesisBlockHash()))) {
                 // TODO(CT/CA) check for asset type
                 reason = "invalid-pegout-proof";
                 return false;
@@ -135,6 +145,12 @@ bool IsStandardTx(const CTransaction& tx, std::string& reason)
             reason = "dust";
             return false;
         }
+    }
+
+    // only one OP_RETURN txout is permitted
+    if (nDataOut > 1) {
+        reason = "multi-op-return";
+        return false;
     }
 
     return true;
