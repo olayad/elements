@@ -8,6 +8,9 @@
 #include <tinyformat.h>
 #include <utilstrencodings.h>
 
+#include <secp256k1/include/secp256k1_whitelist.h>
+#include <primitives/block.h>
+
 const char* GetOpName(opcodetype opcode)
 {
     switch (opcode)
