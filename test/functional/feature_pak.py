@@ -14,7 +14,7 @@ def pak_to_option(pak):
 # 'reject' and finally to pak2. There are 5 nodes each with different
 # configurations
 # All nodes validate pegouts but the first one
-args = [["-acceptnonstdtxn=1"]] + [["-acceptnonstdtxn=0"]]*4
+args = [["-acceptnonstdtxn=1"]] + [["-acceptnonstdtxn=0", "-enforce_pak=1"]]*4
 # The node at index 0 doesn't validate pegouts
 i_novalidate = 0
 # The node at index 1 has no paklist in config
@@ -253,7 +253,7 @@ class CTTest (BitcoinTestFramework):
         info_results = []
         for i in range(5):
             init_results += [ self.nodes[i].initpegoutwallet(xpub) ]
-            info_results += [ self.nodes[i].getpakinfo() ]
+            info_results += [ self.nodes[i].getwalletpakinfo() ]
             assert_equal(init_results[i]["address_lookahead"], info_results[i]["address_lookahead"])
             assert_equal(init_results[i]["liquid_pak"], info_results[i]["liquid_pak"])
             assert_equal(init_results[i]["liquid_pak_address"], info_results[i]["liquid_pak_address"])
@@ -276,7 +276,7 @@ class CTTest (BitcoinTestFramework):
         errorString = ""
  
         new_init = self.nodes[i_novalidate].initpegoutwallet(xpub, 2)
-        assert_equal(self.nodes[i_novalidate].getpakinfo()["derivation_path"], "/0/2")
+        assert_equal(self.nodes[i_novalidate].getwalletpakinfo()["derivation_path"], "/0/2")
         assert_equal(new_init["address_lookahead"][0], init_results[i_novalidate]["address_lookahead"][2])
         assert(new_init["liquid_pak"] != init_results[i_novalidate]["liquid_pak"])
 
@@ -290,7 +290,7 @@ class CTTest (BitcoinTestFramework):
         self._setup_network(extra_args, False)
 
         # Check PAK settings persistance in wallet across restart
-        restarted_info = self.nodes[i_novalidate].getpakinfo()
+        restarted_info = self.nodes[i_novalidate].getwalletpakinfo()
         assert_equal(restarted_info["bitcoin_xpub"], xpub)
         assert_equal(restarted_info["liquid_pak"], new_init["liquid_pak"])
         assert_equal(restarted_info["derivation_path"], "/0/2")
@@ -312,7 +312,7 @@ class CTTest (BitcoinTestFramework):
         errorString = ""
 
         # Ensure counter is untouched
-        assert_equal(self.nodes[i_novalidate].getpakinfo()["derivation_path"], "/0/2")
+        assert_equal(self.nodes[i_novalidate].getwalletpakinfo()["derivation_path"], "/0/2")
 
         # pak1 generates a block, creating block commitment
         self.nodes[i_pak1].generate(1)
@@ -320,7 +320,7 @@ class CTTest (BitcoinTestFramework):
 
         # pak1 will now create a pegout.
         pak1_pegout_txid = self.nodes[i_pak1].sendtomainchain(1)["txid"]
-        assert_equal(self.nodes[i_pak1].getpakinfo()["derivation_path"], "/0/1")
+        assert_equal(self.nodes[i_pak1].getwalletpakinfo()["derivation_path"], "/0/1")
 
         # Wait for two nodes to get transaction in mempool only
         time_to_wait = 15
