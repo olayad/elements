@@ -14,23 +14,27 @@ def pak_to_option(pak):
 # 'reject' and finally to pak2. There are 5 nodes each with different
 # configurations
 # All nodes validate pegouts but the first one
-args = [["-acceptnonstdtxn=1"]] + [["-acceptnonstdtxn=0", "-enforce_pak=1"]]*4
-# The node at index 0 doesn't validate pegouts
+
+# The node at index 0 doesn't validate pegouts, just normal standardness
 i_novalidate = 0
 # The node at index 1 has no paklist in config
 i_undefined = 1
 # Paklist 1 in config
 i_pak1 = 2
-pak1 = [("02fcba7ecf41bc7e1be4ee122d9d22e3333671eb0a3a87b5cdf099d59874e1940f", "02a28b3078b6fe9d2b0f098ffb491b8e98a7fe56ebe321ba52f90becdd06507bbf"),
-        ("02101bed11081c19b25e02dd618da53af1ba29849bbe4006fb3d6e2d3b0d874405", "02c9cf4bdef23d38e6c9ae73b83001711debea113573cfbe0fb729ff81638549da")]
 # Paklist 2 in config
 i_pak2 = 3
-pak2 = [("03767a74373b7207c5ae1214295197a88ec2abdf92e9e2a29daf024c322fae9fcb", "033e4740d0ba639e28963f3476157b7cf2fb7c6fdf4254f97099cf8670b505ea59"),
-        ("02f4a7445f9c48ee8590a930d3fc4f0f5763e3d1d003fdf5fc822e7ba18f380632", "036b3786f029751ada9f02f519a86c7e02fb2963a7013e7e668eb5f7ec069b9e7e")]
 # Reject in config
 i_reject = 4
-args[i_reject] = args[i_reject] + ['-pak=reject']
 
+# The two conflicting pak lists
+pak1 = [("02fcba7ecf41bc7e1be4ee122d9d22e3333671eb0a3a87b5cdf099d59874e1940f", "02a28b3078b6fe9d2b0f098ffb491b8e98a7fe56ebe321ba52f90becdd06507bbf"),
+        ("02101bed11081c19b25e02dd618da53af1ba29849bbe4006fb3d6e2d3b0d874405", "02c9cf4bdef23d38e6c9ae73b83001711debea113573cfbe0fb729ff81638549da")]
+pak2 = [("03767a74373b7207c5ae1214295197a88ec2abdf92e9e2a29daf024c322fae9fcb", "033e4740d0ba639e28963f3476157b7cf2fb7c6fdf4254f97099cf8670b505ea59"),
+        ("02f4a7445f9c48ee8590a930d3fc4f0f5763e3d1d003fdf5fc822e7ba18f380632", "036b3786f029751ada9f02f519a86c7e02fb2963a7013e7e668eb5f7ec069b9e7e")]
+
+# Args that will be re-used in slightly different ways across runs
+args = [["-acceptnonstdtxn=0"]] + [["-acceptnonstdtxn=0", "-enforce_pak=1"]]*4
+args[i_reject] = args[i_reject] + ['-pak=reject']
 # Novalidate has pak entry, should not act on it ever
 args[i_novalidate] = args[i_novalidate] + pak_to_option(pak1)
 
@@ -54,11 +58,11 @@ class CTTest (BitcoinTestFramework):
 #        self.is_network_split=False
 #        self.sync_all()
 
-    def setup_network(self, split=False):
-        extra_args = copy.deepcopy(args)
-        extra_args[i_pak1] = extra_args[i_pak1] + pak_to_option(pak1)
-        extra_args[i_pak2] = extra_args[i_pak2] + pak_to_option(pak2)
-        self._setup_network(extra_args, split)
+#    def setup_network(self, split=False):
+#        extra_args = copy.deepcopy(args)
+#        extra_args[i_pak1] = extra_args[i_pak1] + pak_to_option(pak1)
+#        extra_args[i_pak2] = extra_args[i_pak2] + pak_to_option(pak2)
+#        self._setup_network(extra_args, split)
 
     # Set up blockchain such that all coins belong to node i_undefined
 #    def _setup_initial_state(self):
@@ -75,6 +79,12 @@ class CTTest (BitcoinTestFramework):
 #        assert("bitcoin" not in self.nodes[4].getbalance())
 
     def set_test_params(self):
+        self.num_nodes = 5
+        self.setup_clean_chain = True
+        self.extra_args = copy.deepcopy(args)
+        self.extra_args[i_pak1] = self.extra_args[i_pak1] + pak_to_option(pak1)
+        self.extra_args[i_pak2] = self.extra_args[i_pak2] + pak_to_option(pak2)
+
 
     def run_test(self):
         self._setup_initial_state()
@@ -212,14 +222,15 @@ class CTTest (BitcoinTestFramework):
 
         # PAK transition: reject -> pak2
         # Restart nodes while putting pak2 in i_pak1's config instead of pak1.
-        stop_nodes(self.nodes)
+        self.stop_nodes()
         extra_args = copy.deepcopy(args)
         extra_args[i_pak1] = extra_args[i_pak1] + pak_to_option(pak2)
         extra_args[i_pak2] = extra_args[i_pak2] + pak_to_option(pak2)
         # Also test novalidate behaves correctly when set to reject after removing
         # the two pak entries
         extra_args[i_novalidate] = extra_args[i_novalidate][:-2] + ['-pak=reject']
-        self._setup_network(extra_args, False)
+        self.start_nodes(extra_args)
+
         # Check current state of i_pak1
         test_pak(self.nodes[i_pak1], pak2, "reject", True)
         # Create a new block with i_pak1 which should have a commitment to pak2
@@ -229,6 +240,7 @@ class CTTest (BitcoinTestFramework):
         assert_equal(self.nodes[i_undefined].testproposedblock(block_proposal), None)
         assert_equal(self.nodes[i_pak1].testproposedblock(block_proposal), None)
         assert_equal(self.nodes[i_pak2].testproposedblock(block_proposal), None)
+        assert_raises_rpc_error()
         try:
             assert_equal(self.nodes[i_reject].testproposedblock(block_proposal), None)
         except JSONRPCException as e:
@@ -360,8 +372,6 @@ class CTTest (BitcoinTestFramework):
             errorString = e.error['message']
         assert_equal("bitcoin_xpub is invalid for this network" in errorString, True)
         errorString = ""
-
-        # TODO add manual peg-out checks
 
 if __name__ == '__main__':
     CTTest ().main ()
