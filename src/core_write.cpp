@@ -221,12 +221,17 @@ void TxToUniv(const CTransaction& tx, const uint256& hashBlock, UniValue& entry,
             o.pushKV("hex", HexStr(txin.scriptSig.begin(), txin.scriptSig.end()));
             in.pushKV("scriptSig", o);
 
-            if (!tx.vin[i].scriptWitness.IsNull()) {
-                UniValue txinwitness(UniValue::VARR);
-                for (const auto& item : tx.vin[i].scriptWitness.stack) {
-                    txinwitness.push_back(HexStr(item.begin(), item.end()));
+            if (tx.witness.vtxinwit.size() > i) {
+                const CScriptWitness &scriptWitness = tx.witness.vtxinwit[i].scriptWitness;
+                if (!scriptWitness.IsNull()) {
+//M.S.            if (!tx.vin[i].scriptWitness.IsNull()) {
+                    UniValue txinwitness(UniValue::VARR);
+                    for (const auto &item : scriptWitness.stack) {
+//M.S.                for (const auto& item : tx.vin[i].scriptWitness.stack) {
+                        txinwitness.push_back(HexStr(item.begin(), item.end()));
+                    }
+                    in.pushKV("txinwitness", txinwitness);
                 }
-                in.pushKV("txinwitness", txinwitness);
             }
 
             // ELEMENTS:

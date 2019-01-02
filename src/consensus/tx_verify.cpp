@@ -171,7 +171,12 @@ int64_t GetTransactionSigOpCost(const CTransaction& tx, const CCoinsViewCache& i
             assert(!coin.IsSpent());
             prevout = coin.out;
         }
-        nSigOps += CountWitnessSigOps(tx.vin[i].scriptSig, prevout.scriptPubKey, &tx.vin[i].scriptWitness, flags);
+
+        const CScriptWitness *pScriptWitness = nullptr;
+        if(tx.witness.vtxinwit.size() > i) {
+            pScriptWitness = &tx.witness.vtxinwit[i].scriptWitness;
+        }
+        nSigOps += CountWitnessSigOps(tx.vin[i].scriptSig, prevout.scriptPubKey, pScriptWitness, flags);
     }
     return nSigOps;
 }
