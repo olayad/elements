@@ -340,7 +340,17 @@ class FedPegTest(BitcoinTestFramework):
         sidechain.claimpegin(raw, proof) # stuck peg
         sidechain.generate(1)
         print("Waiting to ensure block is being rejected by sidechain2")
-        time.sleep(5)
+        print("Sleep 1")
+        time.sleep(1)
+        print("Sleep 2")
+        time.sleep(1)
+        print("Sleep 3")
+        time.sleep(1)
+        print("Sleep 4")
+        time.sleep(1)
+        print("Sleep 5")
+        time.sleep(1)
+        print("Done sleeping")
 
         assert(sidechain.getblockcount() != sidechain2.getblockcount())
 
