@@ -2,7 +2,7 @@
 // Created by michael on 12/12/18.
 //
 
-#include "CTxWitness.h"
+#include "txwitness.h"
 
 #include <hash.h>
 #include "consensus/merkle.h"

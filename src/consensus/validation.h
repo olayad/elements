@@ -103,16 +103,15 @@ static inline int64_t GetBlockWeight(const CBlock& block)
 {
     return ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS) * (WITNESS_SCALE_FACTOR - 1) + ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
 }
-//M.S. static inline int64_t GetTransactionInputWeight(const CTxIn& txin)
-static inline int64_t GetTransactionInputWeight(const CTransaction& tx)
+
+static inline int64_t GetTransactionInputWeight(const CTransaction& tx, const size_t nIn)
 {
     // scriptWitness size is added here because witnesses and txins are split up in segwit serialization.
-//M.S.    return ::GetSerializeSize(txin, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS) * (WITNESS_SCALE_FACTOR - 1) + ::GetSerializeSize(txin, SER_NETWORK, PROTOCOL_VERSION) + ::GetSerializeSize(txin.scriptWitness.stack, SER_NETWORK, PROTOCOL_VERSION);
-    assert(tx.witness.vtxinwit.size() > 0);
-    return ::GetSerializeSize(tx.vin[0], SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS) * (WITNESS_SCALE_FACTOR - 1)
-    + ::GetSerializeSize(tx.vin[0], SER_NETWORK, PROTOCOL_VERSION)
-    + ::GetSerializeSize(tx.witness.vtxinwit[0].scriptWitness.stack, SER_NETWORK, PROTOCOL_VERSION)
-    + ::GetSerializeSize(tx.witness.vtxinwit[0].m_pegin_witness.stack, SER_NETWORK, PROTOCOL_VERSION);
+    assert(tx.witness.vtxinwit.size() > nIn);
+    return ::GetSerializeSize(tx.vin[nIn], SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS) * (WITNESS_SCALE_FACTOR - 1)
+    + ::GetSerializeSize(tx.vin[nIn], SER_NETWORK, PROTOCOL_VERSION)
+    + ::GetSerializeSize(tx.witness.vtxinwit[nIn].scriptWitness.stack, SER_NETWORK, PROTOCOL_VERSION)
+    + ::GetSerializeSize(tx.witness.vtxinwit[nIn].m_pegin_witness.stack, SER_NETWORK, PROTOCOL_VERSION);
 }
 
 #endif // BITCOIN_CONSENSUS_VALIDATION_H

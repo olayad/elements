@@ -316,14 +316,12 @@ BOOST_FIXTURE_TEST_CASE(checkinputs_test, TestChain100Setup)
         // Sign
         SignatureData sigdata;
         ProduceSignature(keystore, MutableTransactionSignatureCreator(&valid_with_witness_tx, 0, 11*CENT, SIGHASH_ALL), spend_tx.vout[1].scriptPubKey, sigdata);
-//MS        UpdateInput(valid_with_witness_tx.vin[0], sigdata);
         UpdateTransaction(valid_with_witness_tx, 0, sigdata);
 
         // This should be valid under all script flags.
         ValidateCheckInputsForAllFlags(valid_with_witness_tx, 0, true);
 
         // Remove the witness, and check that it is now invalid.
-//MS        valid_with_witness_tx.vin[0].scriptWitness.SetNull();
         valid_with_witness_tx.witness.vtxinwit[0].scriptWitness.SetNull();
         ValidateCheckInputsForAllFlags(valid_with_witness_tx, SCRIPT_VERIFY_WITNESS, true);
     }
@@ -347,7 +345,6 @@ BOOST_FIXTURE_TEST_CASE(checkinputs_test, TestChain100Setup)
         for (int i=0; i<2; ++i) {
             SignatureData sigdata;
             ProduceSignature(keystore, MutableTransactionSignatureCreator(&tx, i, 11*CENT, SIGHASH_ALL), spend_tx.vout[i].scriptPubKey, sigdata);
-//MS            UpdateInput(tx.vin[i], sigdata);
             UpdateTransaction(tx, i, sigdata);
         }
 
@@ -357,7 +354,6 @@ BOOST_FIXTURE_TEST_CASE(checkinputs_test, TestChain100Setup)
         // Check that if the second input is invalid, but the first input is
         // valid, the transaction is not cached.
         // Invalidate vin[1]
-//MS        tx.vin[1].scriptWitness.SetNull();
         tx.witness.vtxinwit[1].scriptWitness.SetNull();
 
         CValidationState state;

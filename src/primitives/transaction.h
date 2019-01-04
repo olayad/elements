@@ -11,9 +11,13 @@
 #include <script/script.h>
 #include <serialize.h>
 #include <uint256.h>
-#include "CTxWitness.h"
+#include <primitives/txwitness.h>
 
 static const int SERIALIZE_TRANSACTION_NO_WITNESS = 0x40000000;
+
+// ELEMENTS:
+// Globals to avoid circular dependencies.
+extern bool g_con_elementswitness;
 
 /** An outpoint - a combination of a transaction hash and an index n into its vout */
 class COutPoint
@@ -85,7 +89,6 @@ public:
     COutPoint prevout;
     CScript scriptSig;
     uint32_t nSequence;
-//M.S.    std::shared_ptr<CScriptWitness> scriptWitness; //! Only serialized through CTransaction
 
     //
     // ELEMENTS:
@@ -93,8 +96,6 @@ public:
     /* If this is set to true, the input is interpreted as a
      * peg-in claim and processed as such */
     bool m_is_pegin = false;
-    // Re-use script witness struct to include its own witness
-    CScriptWitness m_pegin_witness;
 
     // END ELEMENTS
     //
@@ -311,31 +312,37 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
         s >> tx.vout;
     }
 
-    if ((flags & 1) && fAllowWitness) {
-        /* The witness flag is present. */
-        flags ^= 1;
-        const_cast<CTxWitness*>(&tx.witness)->vtxinwit.resize(tx.vin.size());
-        const_cast<CTxWitness*>(&tx.witness)->vtxoutwit.resize(tx.vout.size());
-        for (size_t i = 0; i < tx.witness.vtxinwit.size(); ++i) {
-            s >> tx.witness.vtxinwit[i].scriptWitness.stack;
+    // Witness serialization is different between Elements and Core.
+    // See code comments in SerializeTransaction for details about the differences.
+    //TODO(rebase) should we do the const_cast also for the Core case?
+    if (g_con_elementswitness) {
+        s >> tx.nLockTime;
+        if ((flags & 1) && fAllowWitness) {
+            /* The witness flag is present. */
+            flags ^= 1;
+            const_cast<CTxWitness*>(&tx.witness)->vtxinwit.resize(tx.vin.size());
+            const_cast<CTxWitness*>(&tx.witness)->vtxoutwit.resize(tx.vout.size());
+            s >> tx.witness;
         }
-
-        // ELEMENTS:
-        for (size_t i = 0; i < tx.vin.size(); i++) {
-            if (tx.vin[i].m_is_pegin) {
-                s >> tx.vin[i].m_pegin_witness.stack;
+    } else {
+        if ((flags & 1) && fAllowWitness) {
+            /* The witness flag is present. */
+            flags ^= 1;
+            for (size_t i = 0; i < tx.vin.size(); i++) {
+                s >> tx.witness.vtxinwit[i].scriptWitness.stack;
+                // ELEMENTS:
+                if (tx.vin[i].m_is_pegin) {
+                    s >> tx.witness.vtxinwit[i].m_pegin_witness.stack;
+                }
             }
         }
+        s >> tx.nLockTime;
     }
 
     if (flags) {
         /* Unknown flag in the serialization */
         throw std::ios_base::failure("Unknown transaction optional data");
     }
-
-    s >> tx.nLockTime;
-
-
 }
 
 template<typename Stream, typename TxType>
@@ -360,21 +367,29 @@ inline void SerializeTransaction(const TxType& tx, Stream& s) {
     s << tx.vin;
     s << tx.vout;
 
-    // witness data
-    if (flags & 1) {
-        for (size_t i = 0; i < tx.witness.vtxinwit.size(); i++) {
-            s << tx.witness.vtxinwit[i].scriptWitness.stack;
+    // Witness serialization is different between Elements and Core.
+    if (g_con_elementswitness) {
+        // In Elements-style serialization, the lockTime is serialized first and the 
+        // witnesses all in the end.
+        s << tx.nLockTime;
+        if (flags & 1) {
+            const_cast<CTxWitness*>(&tx.witness)->vtxinwit.resize(tx.vin.size());
+            const_cast<CTxWitness*>(&tx.witness)->vtxoutwit.resize(tx.vout.size());
+            s << tx.witness;
         }
-
-        // ELEMENTS:
-        for (size_t i = 0; i < tx.vin.size(); i++) {
-            if (tx.vin[i].m_is_pegin) {
-                s << tx.vin[i].m_pegin_witness.stack;
+    } else {
+        // In Core-style serialization, the witnesses follow the outputs.
+        if (flags & 1) {
+            for (size_t i = 0; i < tx.vin.size(); i++) {
+                s << tx.witness.vtxinwit[i].scriptWitness.stack;
+                // ELEMENTS:
+                if (tx.vin[i].m_is_pegin) {
+                    s << tx.witness.vtxinwit[i].m_pegin_witness.stack;
+                }
             }
         }
+        s << tx.nLockTime;
     }
-
-    s << tx.nLockTime;
 }
 
 
@@ -469,14 +484,6 @@ public:
 
     bool HasWitness() const
     {
-        //TODO(stevenroose) witness
-        // ELEMENTS:
-        for (size_t i = 0; i < vin.size(); i++) {
-            if (!vin[i].m_pegin_witness.IsNull()) {
-                return true;
-            }
-        }
-
         return !witness.IsNull();
     }
 };
@@ -517,14 +524,7 @@ struct CMutableTransaction
 
     bool HasWitness() const
     {
-        //TODO: Previous version only checked IsNull?
-        return (!witness.IsNull() && !witness.IsEmpty());
-//        for (size_t i = 0; i < vin.size(); i++) {
-//            if (!vin[i].scriptWitness.IsNull()) {
-//                return true;
-//            }
-//        }
-//        return false;
+        return !witness.IsNull();
     }
 };
 

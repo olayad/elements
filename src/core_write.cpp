@@ -224,10 +224,8 @@ void TxToUniv(const CTransaction& tx, const uint256& hashBlock, UniValue& entry,
             if (tx.witness.vtxinwit.size() > i) {
                 const CScriptWitness &scriptWitness = tx.witness.vtxinwit[i].scriptWitness;
                 if (!scriptWitness.IsNull()) {
-//M.S.            if (!tx.vin[i].scriptWitness.IsNull()) {
                     UniValue txinwitness(UniValue::VARR);
                     for (const auto &item : scriptWitness.stack) {
-//M.S.                for (const auto& item : tx.vin[i].scriptWitness.stack) {
                         txinwitness.push_back(HexStr(item.begin(), item.end()));
                     }
                     in.pushKV("txinwitness", txinwitness);
@@ -236,9 +234,9 @@ void TxToUniv(const CTransaction& tx, const uint256& hashBlock, UniValue& entry,
 
             // ELEMENTS:
             in.pushKV("is_pegin", txin.m_is_pegin);
-            if (!tx.vin[i].m_pegin_witness.IsNull()) {
+            if (tx.witness.vtxinwit.size() > i && !tx.witness.vtxinwit[i].m_pegin_witness.IsNull()) {
                 UniValue pegin_witness(UniValue::VARR);
-                for (const auto& item : tx.vin[i].m_pegin_witness.stack) {
+                for (const auto& item : tx.witness.vtxinwit[i].m_pegin_witness.stack) {
                     pegin_witness.push_back(HexStr(item.begin(), item.end()));
                 }
                 in.pushKV("pegin_witness", pegin_witness);

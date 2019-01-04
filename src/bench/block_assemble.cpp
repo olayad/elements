@@ -94,7 +94,6 @@ static void AssembleBlock(benchmark::State& state)
         CMutableTransaction tx;
         tx.vin.push_back(MineBlock(SCRIPT_PUB));
         tx.witness.vtxinwit.back().scriptWitness = witness;
-//M.S.        tx.vin.back().scriptWitness = witness;
         tx.vout.emplace_back(1337, SCRIPT_PUB);
         if (NUM_BLOCKS - b >= COINBASE_MATURITY)
             txs.at(b) = MakeTransactionRef(tx);

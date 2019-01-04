@@ -322,8 +322,7 @@ SignatureData DataFromTransaction(const CMutableTransaction& tx, unsigned int nI
     SignatureData data;
     assert(tx.vin.size() > nIn);
     data.scriptSig = tx.vin[nIn].scriptSig;
-    data.scriptWitness = (tx.witness.vtxinwit.size() > nIn) ? tx.witness.vtxinwit[nIn].scriptWitness : CScriptWitness();
-//M.S.    data.scriptWitness = tx.vin[nIn].scriptWitness;
+    data.scriptWitness = tx.witness.vtxinwit.size() > nIn ? tx.witness.vtxinwit[nIn].scriptWitness : CScriptWitness();
     Stacks stack(data);
 
     // Get signatures
@@ -384,13 +383,7 @@ SignatureData DataFromTransaction(const CMutableTransaction& tx, unsigned int nI
     return data;
 }
 
-//MS void UpdateInput(CTxIn& input, const SignatureData& data)
-//{
-//    input.scriptSig = data.scriptSig;
-//    input.scriptWitness = data.scriptWitness;
-//}
-
-void UpdateTransaction(CMutableTransaction& tx, unsigned int nIn, const SignatureData& data) {
+void UpdateTransaction(CMutableTransaction& tx, const size_t nIn, const SignatureData& data) {
     assert(tx.vin.size() > nIn);
     tx.witness.vtxinwit.resize(tx.vin.size());
     tx.vin[nIn].scriptSig = data.scriptSig;
@@ -424,7 +417,6 @@ bool SignSignature(const SigningProvider &provider, const CScript& fromPubKey, C
 
     SignatureData sigdata;
     bool ret = ProduceSignature(provider, creator, fromPubKey, sigdata);
-//MS    UpdateInput(txTo.vin.at(nIn), sigdata);
     UpdateTransaction(txTo, nIn, sigdata);
     return ret;
 }

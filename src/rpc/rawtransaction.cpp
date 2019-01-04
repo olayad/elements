@@ -687,9 +687,6 @@ static void TxInErrorToJSON(const CTxIn& txin, const CTxInWitness& txinwit, UniV
     entry.pushKV("txid", txin.prevout.hash.ToString());
     entry.pushKV("vout", (uint64_t)txin.prevout.n);
     UniValue witness(UniValue::VARR);
-//    for (unsigned int                    i = 0; i < txin.scriptWitness.stack.size(); i++) {
-//        witness.push_back(HexStr(txin.scriptWitness.stack[i].begin(), txin.scriptWitness.stack[i].end()));
-//    }
     for (unsigned int i = 0; i < txinwit.scriptWitness.stack.size(); i++) {
         witness.push_back(HexStr(txinwit.scriptWitness.stack[i].begin(), txinwit.scriptWitness.stack[i].end()));
     }
@@ -779,7 +776,6 @@ static UniValue combinerawtransaction(const JSONRPCRequest& request)
         }
         ProduceSignature(DUMMY_SIGNING_PROVIDER, MutableTransactionSignatureCreator(&mergedTx, i, coin.out.nValue, 1), coin.out.scriptPubKey, sigdata);
 
-//MS        UpdateInput(txin, sigdata);
         UpdateTransaction(mergedTx, i, sigdata);
     }
 
@@ -887,26 +883,25 @@ UniValue SignTransaction(CMutableTransaction& mtx, const UniValue& prevTxsUnival
     // Sign what we can, including pegin inputs:
     for (unsigned int i = 0; i < mtx.vin.size(); i++) {
         CTxIn& txin = mtx.vin[i];
-        CTxInWitness emptyWitness;
-        CTxInWitness& inWitness = ((mtx.witness.vtxinwit.size() > i) ? mtx.witness.vtxinwit[i]: emptyWitness);
+        const CTxInWitness& inWitness = mtx.witness.vtxinwit.size() > i ? mtx.witness.vtxinwit[i] : CTxInWitness();
         const Coin& coin = view.AccessCoin(txin.prevout);
 
         if (!txin.m_is_pegin && coin.IsSpent()) {
             TxInErrorToJSON(txin, inWitness, vErrors, "Input not found or already spent");
             continue;
-        } else if (txin.m_is_pegin && (!IsValidPeginWitness(txConst.vin[i].m_pegin_witness, txin.prevout, false))) {
-            TxInErrorToJSON(txin, vErrors, "Peg-in input has invalid proof.");
+        } else if (txin.m_is_pegin && (txConst.witness.vtxinwit.size() <= i || !IsValidPeginWitness(txConst.witness.vtxinwit[i].m_pegin_witness, txin.prevout, false))) {
+            TxInErrorToJSON(txin, inWitness, vErrors, "Peg-in input has invalid proof.");
             continue;
         }
         // Report warning about immature peg-in though
-        if(txin.m_is_pegin && !IsValidPeginWitness(txConst.vin[i].m_pegin_witness, txin.prevout, true)) {
+        if(txin.m_is_pegin && !IsValidPeginWitness(txConst.witness.vtxinwit[i].m_pegin_witness, txin.prevout, true)) {
             immature_pegin = true;
         }
 
-        const CScript& prevPubKey = txin.m_is_pegin ? GetPeginOutputFromWitness(txConst.vin[i].m_pegin_witness).scriptPubKey : coin.out.scriptPubKey;
+        const CScript& prevPubKey = txin.m_is_pegin ? GetPeginOutputFromWitness(txConst.witness.vtxinwit[i].m_pegin_witness).scriptPubKey : coin.out.scriptPubKey;
         //TODO(rebase) CT
-        //const CConfidentialValue& amount = txin.m_is_pegin ? GetPeginOutputFromWitness(txConst.vin[i].m_pegin_witness).nValue : coin.out.nValue;
-        const CAmount& amount = txin.m_is_pegin ? GetPeginOutputFromWitness(txConst.vin[i].m_pegin_witness).nValue : coin.out.nValue;
+        //const CConfidentialValue& amount = txin.m_is_pegin ? GetPeginOutputFromWitness(txConst.witness.vtxinwit[i].m_pegin_witness).nValue : coin.out.nValue;
+        const CAmount& amount = txin.m_is_pegin ? GetPeginOutputFromWitness(txConst.witness.vtxinwit[i].m_pegin_witness).nValue : coin.out.nValue;
 
         SignatureData sigdata = DataFromTransaction(mtx, i, coin.out);
         // Only sign SIGHASH_SINGLE if there's a corresponding output:
@@ -914,25 +909,20 @@ UniValue SignTransaction(CMutableTransaction& mtx, const UniValue& prevTxsUnival
             ProduceSignature(*keystore, MutableTransactionSignatureCreator(&mtx, i, amount, nHashType), prevPubKey, sigdata);
         }
 
-//MS        UpdateInput(txin, sigdata);
         UpdateTransaction(mtx, i, sigdata);
 
         // amount must be specified for valid segwit signature
-//MS        if (amount == MAX_MONEY && !txin.scriptWitness.IsNull()) {
         if (amount == MAX_MONEY && !inWitness.scriptWitness.IsNull()) {
             throw JSONRPCError(RPC_TYPE_ERROR, strprintf("Missing amount for %s", coin.out.ToString()));
         }
 
         ScriptError serror = SCRIPT_ERR_OK;
-//MS        if (!VerifyScript(txin.scriptSig, prevPubKey, &txin.scriptWitness, STANDARD_SCRIPT_VERIFY_FLAGS, TransactionSignatureChecker(&txConst, i, amount), &serror)) {
         if (!VerifyScript(txin.scriptSig, prevPubKey, &inWitness.scriptWitness, STANDARD_SCRIPT_VERIFY_FLAGS, TransactionSignatureChecker(&txConst, i, amount), &serror)) {
             if (serror == SCRIPT_ERR_INVALID_STACK_OPERATION) {
                 // Unable to sign input and verification failed (possible attempt to partially sign).
-//MS                TxInErrorToJSON(txin, vErrors, "Unable to sign input, invalid stack size (possibly missing key)");
                 TxInErrorToJSON(txin, inWitness, vErrors, "Unable to sign input, invalid stack size (possibly missing key)");
             } else {
                 TxInErrorToJSON(txin, inWitness, vErrors, ScriptErrorString(serror));
-//MS                TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));
             }
         }
     }
@@ -1712,7 +1702,6 @@ UniValue finalizepsbt(const JSONRPCRequest& request)
         mtx.witness.vtxinwit.resize(mtx.vin.size());
         for (unsigned int i = 0; i < mtx.vin.size(); ++i) {
             mtx.vin[i].scriptSig = psbtx.inputs[i].final_script_sig;
-//MS            mtx.vin[i].scriptWitness = psbtx.inputs[i].final_script_witness;
             mtx.witness.vtxinwit[i].scriptWitness = psbtx.inputs[i].final_script_witness;
         }
         ssTx << mtx;
@@ -1835,7 +1824,6 @@ UniValue converttopsbt(const JSONRPCRequest& request)
             throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Inputs must not have scriptSigs");
         }
         input.scriptSig.clear();
-//MS        input.scriptWitness.SetNull();
     }
     for (CTxInWitness& witness: tx.witness.vtxinwit) {
         if ((!witness.scriptWitness.IsNull()) && (request.params[1].isNull() || (!request.params[1].isNull() && request.params[1].get_bool()))) {

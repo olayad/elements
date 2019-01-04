@@ -1357,9 +1357,11 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo &txund
     // mark inputs spent
     if (!tx.IsCoinBase()) {
         txundo.vprevout.reserve(tx.vin.size());
-        for (const CTxIn &txin : tx.vin) {
+        for (size_t i = 0; i < tx.vin.size(); i++) {
+            const CTxIn& txin = tx.vin[i];
             if (txin.m_is_pegin) {
-                std::pair<uint256, COutPoint> outpoint = std::make_pair(uint256(txin.m_pegin_witness.stack[2]), txin.prevout);
+                const CTxInWitness& txinwit = tx.witness.vtxinwit[i];
+                std::pair<uint256, COutPoint> outpoint = std::make_pair(uint256(txinwit.m_pegin_witness.stack[2]), txin.prevout);
                 inputs.SetPeginSpent(outpoint, true);
                 // Dummy undo
                 txundo.vprevout.emplace_back();
@@ -1382,11 +1384,7 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, int nHeight)
 
 bool CScriptCheck::operator()() {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
-    const CScriptWitness *witness = nullptr;
-    if (ptxTo->witness.vtxinwit.size() > nIn) {
-        witness = &ptxTo->witness.vtxinwit[nIn].scriptWitness;
-    }
-//M.S.    const CScriptWitness *witness = &ptxTo->vin[nIn].scriptWitness;
+    const CScriptWitness *witness = ptxTo->witness.vtxinwit.size() > nIn ? &ptxTo->witness.vtxinwit[nIn].scriptWitness : NULL;
     return VerifyScript(scriptSig, m_tx_out.scriptPubKey, witness, nFlags, CachingTransactionSignatureChecker(ptxTo, nIn, m_tx_out.nValue, cacheStore, *txdata), &error);
 }
 
@@ -1464,7 +1462,7 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
                 Coin pegin_coin;
                 if (tx.vin[i].m_is_pegin) {
                     // Height of "output" in script evaluation will be 0
-                    pegin_coin = Coin(GetPeginOutputFromWitness(tx.vin[i].m_pegin_witness), 0, false);
+                    pegin_coin = Coin(GetPeginOutputFromWitness(tx.witness.vtxinwit[i].m_pegin_witness), 0, false);
                 }
 
                 const Coin& coin = tx.vin[i].m_is_pegin ? pegin_coin : inputs.AccessCoin(prevout);
@@ -1690,7 +1688,7 @@ DisconnectResult CChainState::DisconnectBlock(const CBlock& block, const CBlockI
             }
             for (unsigned int j = tx.vin.size(); j-- > 0;) {
                 const COutPoint &out = tx.vin[j].prevout;
-                const CScriptWitness& pegin_wit = tx.vin[j].m_pegin_witness;
+                const CScriptWitness& pegin_wit = tx.witness.vtxinwit.size() > j ? tx.witness.vtxinwit[j].m_pegin_witness : CScriptWitness();
                 int res = ApplyTxInUndo(std::move(txundo.vprevout[j]), view, out, tx.vin[j], pegin_wit);
                 if (res == DISCONNECT_FAILED) return DISCONNECT_FAILED;
                 fClean = fClean && res != DISCONNECT_UNCLEAN;
@@ -3329,8 +3327,6 @@ void UpdateUncommittedBlockStructures(CBlock& block, const CBlockIndex* pindexPr
         tx.witness.vtxinwit.resize(1);
         tx.witness.vtxinwit[0].scriptWitness.stack.resize(1);
         tx.witness.vtxinwit[0].scriptWitness.stack[0] = nonce;
-//M.S.        tx.vin[0].scriptWitness.stack.resize(1);
-//M.S.        tx.vin[0].scriptWitness.stack[0] = nonce;
         block.vtx[0] = MakeTransactionRef(std::move(tx));
     }
 }
@@ -3543,11 +3539,9 @@ static bool ContextualCheckBlock(const CBlock& block, CValidationState& state, c
             if ((block.vtx[0]->witness.vtxinwit.empty()) ||
                 (block.vtx[0]->witness.vtxinwit[0].scriptWitness.stack.size() != 1) ||
                 (block.vtx[0]->witness.vtxinwit[0].scriptWitness.stack[0].size() != 32)) {
-//M.S.            if (block.vtx[0]->vin[0].scriptWitness.stack.size() != 1 || block.vtx[0]->vin[0].scriptWitness.stack[0].size() != 32) {
                 return state.DoS(100, false, REJECT_INVALID, "bad-witness-nonce-size", true, strprintf("%s : invalid witness reserved value size", __func__));
             }
             CHash256().Write(hashWitness.begin(), 32).Write(&block.vtx[0]->witness.vtxinwit[0].scriptWitness.stack[0][0], 32).Finalize(hashWitness.begin());
-//M.S.            CHash256().Write(hashWitness.begin(), 32).Write(&block.vtx[0]->vin[0].scriptWitness.stack[0][0], 32).Finalize(hashWitness.begin());
             if (memcmp(hashWitness.begin(), &block.vtx[0]->vout[commitpos].scriptPubKey[6], 32)) {
                 return state.DoS(100, false, REJECT_INVALID, "bad-witness-merkle-match", true, strprintf("%s : witness merkle commitment mismatch", __func__));
             }

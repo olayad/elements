@@ -22,7 +22,7 @@ static CMutableTransaction BuildCreditingTransaction(const CScript& scriptPubKey
     txCredit.nLockTime = 0;
     txCredit.vin.resize(1);
     txCredit.vout.resize(1);
-//MS Would it make sense to resize txSpend.witness.vtxinwit here?
+    //TODO(stevenroose) Would it make sense to resize txSpend.witness.vtxinwit here?
     txCredit.vin[0].prevout.SetNull();
     txCredit.vin[0].scriptSig = CScript() << CScriptNum(0) << CScriptNum(0);
     txCredit.vin[0].nSequence = CTxIn::SEQUENCE_FINAL;
@@ -40,7 +40,7 @@ static CMutableTransaction BuildSpendingTransaction(const CScript& scriptSig, co
     txSpend.nLockTime = 0;
     txSpend.vin.resize(1);
     txSpend.vout.resize(1);
-//MS Would it make sense to resize txSpend.witness.vtxinwit here?
+    //TODO(stevenroose) Would it make sense to resize txSpend.witness.vtxinwit here?
     txSpend.vin[0].prevout.hash = txCredit.GetHash();
     txSpend.vin[0].prevout.n = 0;
     txSpend.vin[0].scriptSig = scriptSig;
@@ -78,7 +78,6 @@ static void VerifyScriptBench(benchmark::State& state)
     CMutableTransaction txSpend = BuildSpendingTransaction(scriptSig, txCredit);
     txSpend.witness.vtxinwit.resize(1);
     CScriptWitness& witness = txSpend.witness.vtxinwit[0].scriptWitness;
-//M.S.    CScriptWitness& witness = txSpend.vin[0].scriptWitness;
     witness.stack.emplace_back();
     key.Sign(SignatureHash(witScriptPubkey, txSpend, 0, SIGHASH_ALL, txCredit.vout[0].nValue, SigVersion::WITNESS_V0), witness.stack.back());
     witness.stack.back().push_back(static_cast<unsigned char>(SIGHASH_ALL));
@@ -91,7 +90,6 @@ static void VerifyScriptBench(benchmark::State& state)
             txSpend.vin[0].scriptSig,
             txCredit.vout[0].scriptPubKey,
             &txSpend.witness.vtxinwit[0].scriptWitness,
-//M.S.            &txSpend.vin[0].scriptWitness,
             flags,
             MutableTransactionSignatureChecker(&txSpend, 0, txCredit.vout[0].nValue),
             &err);

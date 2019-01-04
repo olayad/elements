@@ -116,11 +116,3 @@ test/cache/*
 
 libbitcoinconsensus.pc
 contrib/devtools/split-debug.sh
-
-cmake_install\.cmake
-
-CMakeCache\.txt
-
-compile_commands\.json
-
-CMakeFiles/

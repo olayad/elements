@@ -168,8 +168,6 @@ BOOST_AUTO_TEST_CASE(tx_valid)
                     amount = mapprevOutValues[tx.vin[i].prevout];
                 }
                 unsigned int verify_flags = ParseScriptFlags(test[2].get_str());
-//MS                const CScriptWitness *witness = &tx.vin[i].scriptWitness;
-//                BOOST_CHECK_GT(tx.witness.vtxinwit.size(), i);
                 const CScriptWitness *pScriptWitness = ((tx.witness.vtxinwit.size() > i) ? &tx.witness.vtxinwit[i].scriptWitness : nullptr);
                 BOOST_CHECK_MESSAGE(VerifyScript(tx.vin[i].scriptSig, mapprevOutScriptPubKeys[tx.vin[i].prevout],
                                                  pScriptWitness, verify_flags, TransactionSignatureChecker(&tx, i, amount, txdata), &err),
@@ -256,8 +254,6 @@ BOOST_AUTO_TEST_CASE(tx_invalid)
                 if (mapprevOutValues.count(tx.vin[i].prevout)) {
                     amount = mapprevOutValues[tx.vin[i].prevout];
                 }
-//MS                const CScriptWitness *witness = &tx.vin[i].scriptWitness;
-//                BOOST_CHECK_GT(tx.witness.vtxinwit.size(), i);
                 const CScriptWitness *pScriptWitness = ((tx.witness.vtxinwit.size() > i) ? &tx.witness.vtxinwit[i].scriptWitness :  nullptr);
                 fValid = VerifyScript(tx.vin[i].scriptSig, mapprevOutScriptPubKeys[tx.vin[i].prevout],
                                       pScriptWitness, verify_flags, TransactionSignatureChecker(&tx, i, amount, txdata), &err);
@@ -384,7 +380,6 @@ static void CreateCreditAndSpend(const CKeyStore& keystore, const CScript& outsc
     assert(input.vin[0] == inputm.vin[0]);
     assert(input.vout.size() == 1);
     assert(input.vout[0] == inputm.vout[0]);
-//MS    assert(input.vin[0].scriptWitness.stack == inputm.vin[0].scriptWitness.stack);
     if (!inputm.witness.vtxinwit.empty() && !inputm.witness.vtxinwit[0].scriptWitness.IsNull()) {
         assert(!input.witness.vtxinwit.empty());
         assert(input.witness.vtxinwit[0].scriptWitness.stack ==
@@ -398,7 +393,6 @@ static void CheckWithFlag(const CTransactionRef& output, const CMutableTransacti
 {
     ScriptError error;
     CTransaction inputi(input);
-//MS    bool ret = VerifyScript(inputi.vin[0].scriptSig, output->vout[0].scriptPubKey, &inputi.vin[0].scriptWitness, flags, TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue), &error);
     const CScriptWitness *pScriptWitness = ((inputi.witness.vtxinwit.size() > 0) ? &inputi.witness.vtxinwit[0].scriptWitness : nullptr);
     bool ret = VerifyScript(inputi.vin[0].scriptSig,
             output->vout[0].scriptPubKey,
@@ -657,7 +651,6 @@ BOOST_AUTO_TEST_CASE(test_witness)
     CheckWithFlag(output2, input2, 0, false);
     BOOST_CHECK(*output1 == *output2);
 
-//MS    UpdateInput(input1.vin[0], CombineSignatures(input1, input2, output1));
     UpdateTransaction(input1, 0, CombineSignatures(input1, input2, output1));
     CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
 
@@ -669,7 +662,6 @@ BOOST_AUTO_TEST_CASE(test_witness)
     CheckWithFlag(output2, input2, 0, true);
     CheckWithFlag(output2, input2, SCRIPT_VERIFY_P2SH, false);
     BOOST_CHECK(*output1 == *output2);
-//MS    UpdateInput(input1.vin[0], CombineSignatures(input1, input2, output1));
     UpdateTransaction(input1, 0, CombineSignatures(input1, input2, output1));
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
     CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
@@ -682,7 +674,6 @@ BOOST_AUTO_TEST_CASE(test_witness)
     CheckWithFlag(output2, input2, 0, true);
     CheckWithFlag(output2, input2, SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS, false);
     BOOST_CHECK(*output1 == *output2);
-//MS    UpdateInput(input1.vin[0], CombineSignatures(input1, input2, output1));
     UpdateTransaction(input1, 0, CombineSignatures(input1, input2, output1));
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS, true);
     CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
@@ -695,7 +686,6 @@ BOOST_AUTO_TEST_CASE(test_witness)
     CheckWithFlag(output2, input2, SCRIPT_VERIFY_P2SH, true);
     CheckWithFlag(output2, input2, SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS, false);
     BOOST_CHECK(*output1 == *output2);
-//MS    UpdateInput(input1.vin[0], CombineSignatures(input1, input2, output1));
     UpdateTransaction(input1, 0, CombineSignatures(input1, input2, output1));
     CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS, true);
     CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
