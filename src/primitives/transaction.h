@@ -314,7 +314,6 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
 
     // Witness serialization is different between Elements and Core.
     // See code comments in SerializeTransaction for details about the differences.
-    //TODO(rebase) should we do the const_cast also for the Core case?
     if (g_con_elementswitness) {
         s >> tx.nLockTime;
         if ((flags & 1) && fAllowWitness) {
@@ -328,6 +327,8 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
         if ((flags & 1) && fAllowWitness) {
             /* The witness flag is present. */
             flags ^= 1;
+            const_cast<CTxWitness*>(&tx.witness)->vtxinwit.resize(tx.vin.size());
+            const_cast<CTxWitness*>(&tx.witness)->vtxoutwit.resize(tx.vout.size());
             for (size_t i = 0; i < tx.vin.size(); i++) {
                 s >> tx.witness.vtxinwit[i].scriptWitness.stack;
                 // ELEMENTS:
@@ -380,6 +381,8 @@ inline void SerializeTransaction(const TxType& tx, Stream& s) {
     } else {
         // In Core-style serialization, the witnesses follow the outputs.
         if (flags & 1) {
+            const_cast<CTxWitness*>(&tx.witness)->vtxinwit.resize(tx.vin.size());
+            const_cast<CTxWitness*>(&tx.witness)->vtxoutwit.resize(tx.vout.size());
             for (size_t i = 0; i < tx.vin.size(); i++) {
                 s << tx.witness.vtxinwit[i].scriptWitness.stack;
                 // ELEMENTS:

@@ -73,26 +73,34 @@ uint256 CTransaction::ComputeHash() const
 
 uint256 CTransaction::ComputeWitnessHash() const
 {
-    std::vector<uint256> leaves;
-    leaves.reserve(std::max(vin.size(), vout.size()));
-    /* Inputs */
-    for (size_t i = 0; i < vin.size(); ++i) {
-        const CTxInWitness& txinwit = witness.vtxinwit.size() <= i || vin[i].prevout.IsNull() ? CTxInWitness() : witness.vtxinwit[i];
-        leaves.push_back(txinwit.GetHash());
+    // ELEMENTS:
+    if (g_con_elementswitness) {
+        std::vector<uint256> leaves;
+        leaves.reserve(std::max(vin.size(), vout.size()));
+        /* Inputs */
+        for (size_t i = 0; i < vin.size(); ++i) {
+            const CTxInWitness& txinwit = witness.vtxinwit.size() <= i || vin[i].prevout.IsNull() ? CTxInWitness() : witness.vtxinwit[i];
+            leaves.push_back(txinwit.GetHash());
+        }
+        uint256 hashIn = ComputeFastMerkleRoot(leaves);
+        leaves.clear();
+        /* Outputs */
+        for (size_t i = 0; i < vout.size(); ++i) {
+            const CTxOutWitness& txoutwit = witness.vtxoutwit.size() <= i ? CTxOutWitness() : witness.vtxoutwit[i];
+            leaves.push_back(txoutwit.GetHash());
+        }
+        uint256 hashOut = ComputeFastMerkleRoot(leaves);
+        leaves.clear();
+        /* Combined */
+        leaves.push_back(hashIn);
+        leaves.push_back(hashOut);
+        return ComputeFastMerkleRoot(leaves);
+    } else {
+        if (!HasWitness()) {
+            return hash;
+        }
+        return SerializeHash(*this, SER_GETHASH, 0);
     }
-    uint256 hashIn = ComputeFastMerkleRoot(leaves);
-    leaves.clear();
-    /* Outputs */
-    for (size_t i = 0; i < vout.size(); ++i) {
-        const CTxOutWitness& txoutwit = witness.vtxoutwit.size() <= i ? CTxOutWitness() : witness.vtxoutwit[i];
-        leaves.push_back(txoutwit.GetHash());
-    }
-    uint256 hashOut = ComputeFastMerkleRoot(leaves);
-    leaves.clear();
-    /* Combined */
-    leaves.push_back(hashIn);
-    leaves.push_back(hashOut);
-    return ComputeFastMerkleRoot(leaves);
 }
 
 /* For backward compatibility, the hash is initialized to 0. TODO: remove the need for this default constructor entirely. */
