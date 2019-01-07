@@ -36,7 +36,6 @@
 #include <stdint.h>
 
 #include <univalue.h>
-#include "../undo.h"
 
 
 static void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry)

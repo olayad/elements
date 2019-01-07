@@ -367,10 +367,10 @@ static void CreateCreditAndSpend(const CKeyStore& keystore, const CScript& outsc
     inputm.vin.resize(1);
     inputm.vin[0].prevout.hash = output->GetHash();
     inputm.vin[0].prevout.n = 0;
-    //inputm.witness.vtxinwit.resize(1);
     inputm.vout.resize(1);
     inputm.vout[0].nValue = 1;
     inputm.vout[0].scriptPubKey = CScript();
+    inputm.witness.vtxinwit.resize(1);
     bool ret = SignSignature(keystore, *output, inputm, 0, SIGHASH_ALL);
     assert(ret == success);
     CDataStream ssin(SER_NETWORK, PROTOCOL_VERSION);

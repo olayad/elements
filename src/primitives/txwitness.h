@@ -1,8 +1,8 @@
 //
 // Created by michael on 12/12/18.
 //
-#ifndef ELEMENTS_PRIMITIVES_CTXWITNESS_H
-#define ELEMENTS_PRIMITIVES_CTXWITNESS_H
+#ifndef ELEMENTS_PRIMITIVES_TXWITNESS_H
+#define ELEMENTS_PRIMITIVES_TXWITNESS_H
 
 #include <script/script.h>
 #include <uint256.h>
@@ -148,4 +148,4 @@ private:
 
 
 
-#endif //ELEMENTS_PRIMITIVES_CTXWITNESS_H
+#endif //ELEMENTS_PRIMITIVES_TXWITNESS_H

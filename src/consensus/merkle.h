@@ -28,6 +28,8 @@ uint256 BlockWitnessMerkleRoot(const CBlock& block, bool* mutated = nullptr);
 
 /*
  * Compute the Merkle root of the transactions in a block using mid-state only.
+ * Not that the merkle root calculated with this method is not the same as the 
+ * one computed by ComputeMerkleRoot.
  */
 uint256 ComputeFastMerkleRoot(const std::vector<uint256>& hashes);
 
