@@ -298,8 +298,6 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
     tx.vin.clear();
     tx.vout.clear();
     tx.witness.SetNull();
-    const_cast<CTxWitness*>(&tx.witness)->vtxinwit.resize(tx.vin.size());
-    const_cast<CTxWitness*>(&tx.witness)->vtxoutwit.resize(tx.vout.size());
     /* Try to read the vin. In case the dummy is there, this will be read as an empty vector. */
     s >> tx.vin;
     if (tx.vin.size() == 0 && fAllowWitness) {
@@ -321,12 +319,16 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
         if ((flags & 1) && fAllowWitness) {
             /* The witness flag is present. */
             flags ^= 1;
+            const_cast<CTxWitness*>(&tx.witness)->vtxinwit.resize(tx.vin.size());
+            const_cast<CTxWitness*>(&tx.witness)->vtxoutwit.resize(tx.vout.size());
             s >> tx.witness;
         }
     } else {
         if ((flags & 1) && fAllowWitness) {
             /* The witness flag is present. */
             flags ^= 1;
+            const_cast<CTxWitness*>(&tx.witness)->vtxinwit.resize(tx.vin.size());
+            const_cast<CTxWitness*>(&tx.witness)->vtxoutwit.resize(tx.vout.size());
             for (size_t i = 0; i < tx.vin.size(); i++) {
                 s >> tx.witness.vtxinwit[i].scriptWitness.stack;
                 // ELEMENTS:
