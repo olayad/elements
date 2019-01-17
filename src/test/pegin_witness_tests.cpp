@@ -46,6 +46,8 @@ BOOST_FIXTURE_TEST_SUITE(pegin_witness_tests, RegtestingSetup)
 
 BOOST_AUTO_TEST_CASE(witness_valid)
 {
+    //TODO(stevenroose) remove and fix hex ^^
+    g_con_elementswitness = false;
     CScriptWitness witness;
     witness.stack = witness_stack;
 

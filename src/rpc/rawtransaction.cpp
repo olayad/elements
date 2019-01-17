@@ -880,9 +880,10 @@ UniValue SignTransaction(CMutableTransaction& mtx, const UniValue& prevTxsUnival
     // transaction to avoid rehashing.
     const CTransaction txConst(mtx);
     // Sign what we can, including pegin inputs:
+    mtx.witness.vtxinwit.resize(mtx.vin.size());
     for (unsigned int i = 0; i < mtx.vin.size(); i++) {
         CTxIn& txin = mtx.vin[i];
-        const CTxInWitness& inWitness = mtx.witness.vtxinwit.size() > i ? mtx.witness.vtxinwit[i] : CTxInWitness();
+        const CTxInWitness& inWitness = mtx.witness.vtxinwit[i];
         const Coin& coin = view.AccessCoin(txin.prevout);
 
         if (!txin.m_is_pegin && coin.IsSpent()) {
