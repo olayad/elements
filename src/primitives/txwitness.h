@@ -106,9 +106,10 @@ public:
         for (size_t n = 0; n < vtxinwit.size(); n++) {
             READWRITE(vtxinwit[n]);
         }
-        for (size_t n = 0; n < vtxoutwit.size(); n++) {
-            READWRITE(vtxoutwit[n]);
-        }
+        //TODO(rebase) CA/CT
+        //for (size_t n = 0; n < vtxoutwit.size(); n++) {
+        //    READWRITE(vtxoutwit[n]);
+        //}
         if (IsNull()) {
             /* It's illegal to encode a witness when all vtxinwit and vtxoutwit entries are empty. */
             throw std::ios_base::failure("Superfluous witness record");
