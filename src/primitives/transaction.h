@@ -291,32 +291,21 @@ struct CMutableTransaction;
  */
 template<typename Stream, typename TxType>
 inline void UnserializeTransaction(TxType& tx, Stream& s) {
-    const bool fAllowWitness = !(s.GetVersion() & SERIALIZE_TRANSACTION_NO_WITNESS);
 
     s >> tx.nVersion;
     unsigned char flags = 0;
     tx.vin.clear();
     tx.vout.clear();
     tx.witness.SetNull();
-    /* Try to read the vin. In case the dummy is there, this will be read as an empty vector. */
-    s >> tx.vin;
-    if (tx.vin.size() == 0 && fAllowWitness) {
-        /* We read a dummy or an empty vin. */
-        s >> flags;
-        if (flags != 0) {
-            s >> tx.vin;
-            s >> tx.vout;
-        }
-    } else {
-        /* We read a non-empty vin. Assume a normal vout follows. */
-        s >> tx.vout;
-    }
 
     // Witness serialization is different between Elements and Core.
     // See code comments in SerializeTransaction for details about the differences.
     if (g_con_elementswitness) {
+        s >> flags;
+        s >> tx.vin;
+        s >> tx.vout;
         s >> tx.nLockTime;
-        if ((flags & 1) && fAllowWitness) {
+        if (flags & 1) {
             /* The witness flag is present. */
             flags ^= 1;
             const_cast<CTxWitness*>(&tx.witness)->vtxinwit.resize(tx.vin.size());
@@ -324,6 +313,22 @@ inline void UnserializeTransaction(TxType& tx, Stream& s) {
             s >> tx.witness;
         }
     } else {
+        const bool fAllowWitness = !(s.GetVersion() & SERIALIZE_TRANSACTION_NO_WITNESS);
+
+        /* Try to read the vin. In case the dummy is there, this will be read as an empty vector. */
+        s >> tx.vin;
+        if (tx.vin.size() == 0 && fAllowWitness) {
+            /* We read a dummy or an empty vin. */
+            s >> flags;
+            if (flags != 0) {
+                s >> tx.vin;
+                s >> tx.vout;
+            }
+        } else {
+            /* We read a non-empty vin. Assume a normal vout follows. */
+            s >> tx.vout;
+        }
+
         if ((flags & 1) && fAllowWitness) {
             /* The witness flag is present. */
             flags ^= 1;
@@ -351,27 +356,24 @@ inline void SerializeTransaction(const TxType& tx, Stream& s) {
     const bool fAllowWitness = !(s.GetVersion() & SERIALIZE_TRANSACTION_NO_WITNESS);
 
     s << tx.nVersion;
-    unsigned char flags = 0;
+
     // Consistency check
-    if (fAllowWitness) {
-        /* Check whether witnesses need to be serialized. */
-        if (tx.HasWitness()) {
-            flags |= 1;
-        }
+    assert(tx.witness.vtxinwit.size() <= tx.vin.size());
+    assert(tx.witness.vtxoutwit.size() <= tx.vout.size());
+
+    // Check whether witnesses need to be serialized.
+    unsigned char flags = 0;
+    if (fAllowWitness && tx.HasWitness()) {
+        flags |= 1;
     }
-    if (flags) {
-        /* Use extended format in case witnesses are to be serialized. */
-        std::vector<CTxIn> vinDummy;
-        s << vinDummy;
-        s << flags;
-    }
-    s << tx.vin;
-    s << tx.vout;
 
     // Witness serialization is different between Elements and Core.
     if (g_con_elementswitness) {
-        // In Elements-style serialization, the lockTime is serialized first and the 
+        // In Elements-style serialization, all normal data is serialized first and the 
         // witnesses all in the end.
+        s << flags;
+        s << tx.vin;
+        s << tx.vout;
         s << tx.nLockTime;
         if (flags & 1) {
             const_cast<CTxWitness*>(&tx.witness)->vtxinwit.resize(tx.vin.size());
@@ -379,7 +381,18 @@ inline void SerializeTransaction(const TxType& tx, Stream& s) {
             s << tx.witness;
         }
     } else {
-        // In Core-style serialization, the witnesses follow the outputs.
+        // In Core-style serialization, we encode the input dummy and the witnesses
+        // follow the outputs before the nLockTime.
+
+        if (flags) {
+            /* Use extended format in case witnesses are to be serialized. */
+            std::vector<CTxIn> vinDummy;
+            s << vinDummy;
+            s << flags;
+        }
+        s << tx.vin;
+        s << tx.vout;
+
         if (flags & 1) {
             const_cast<CTxWitness*>(&tx.witness)->vtxinwit.resize(tx.vin.size());
             const_cast<CTxWitness*>(&tx.witness)->vtxoutwit.resize(tx.vout.size());
