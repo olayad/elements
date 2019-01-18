@@ -11,8 +11,9 @@ class CTxInWitness
 {
 public:
     // TODO generalize CScriptWitness into just CWitness
-    std::vector<unsigned char> vchIssuanceAmountRangeproof;
-    std::vector<unsigned char> vchInflationKeysRangeproof;
+    //TODO(rebase) CA/CT
+    //std::vector<unsigned char> vchIssuanceAmountRangeproof;
+    //std::vector<unsigned char> vchInflationKeysRangeproof;
     CScriptWitness scriptWitness;
     // Re-use script witness struct to include its own witness
     CScriptWitness m_pegin_witness;
@@ -22,8 +23,8 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action)
     {
-        READWRITE(vchIssuanceAmountRangeproof);
-        READWRITE(vchInflationKeysRangeproof);
+        //READWRITE(vchIssuanceAmountRangeproof);
+        //READWRITE(vchInflationKeysRangeproof);
         READWRITE(scriptWitness.stack);
         READWRITE(m_pegin_witness.stack);
     }
@@ -32,12 +33,13 @@ public:
 
     bool IsNull() const
     {
-        return vchIssuanceAmountRangeproof.empty() && vchInflationKeysRangeproof.empty() && scriptWitness.IsNull() && m_pegin_witness.IsNull();
+        //return vchIssuanceAmountRangeproof.empty() && vchInflationKeysRangeproof.empty() && scriptWitness.IsNull() && m_pegin_witness.IsNull();
+        return scriptWitness.IsNull() && m_pegin_witness.IsNull();
     }
     void SetNull()
     {
-        vchIssuanceAmountRangeproof.clear();
-        vchInflationKeysRangeproof.clear();
+        //vchIssuanceAmountRangeproof.clear();
+        //vchInflationKeysRangeproof.clear();
         scriptWitness.stack.clear();
         m_pegin_witness.stack.clear();
     }
