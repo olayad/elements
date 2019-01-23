@@ -110,10 +110,11 @@ public:
         //for (size_t n = 0; n < vtxoutwit.size(); n++) {
         //    READWRITE(vtxoutwit[n]);
         //}
-        if (IsNull()) {
-            /* It's illegal to encode a witness when all vtxinwit and vtxoutwit entries are empty. */
-            throw std::ios_base::failure("Superfluous witness record");
-        }
+        //TODO(stevenroose) re-enabled after testing
+        //if (IsNull()) {
+        //    /* It's illegal to encode a witness when all vtxinwit and vtxoutwit entries are empty. */
+        //    throw std::ios_base::failure("Superfluous witness record");
+        //}
     }
 
     bool IsEmpty() const
