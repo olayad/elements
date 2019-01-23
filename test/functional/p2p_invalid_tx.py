@@ -19,6 +19,7 @@ from test_framework.util import (
     assert_equal,
     wait_until,
 )
+from codecs import encode
 
 
 class InvalidTxRequestTest(BitcoinTestFramework):
@@ -79,10 +80,12 @@ class InvalidTxRequestTest(BitcoinTestFramework):
         # Create a root transaction that we withhold until all dependend transactions
         # are sent out and in the orphan cache
         SCRIPT_PUB_KEY_OP_TRUE = b'\x51\x75' * 15 + b'\x51'
+        self.log.info("SCRIPT_PUB_KEY_OP_TRUE: " + encode(SCRIPT_PUB_KEY_OP_TRUE, 'hex_codec').decode('ascii'))
         tx_withhold = CTransaction()
         tx_withhold.vin.append(CTxIn(outpoint=COutPoint(block1.vtx[0].sha256, 0)))
         tx_withhold.vout.append(CTxOut(nValue=50 * COIN - 12000, scriptPubKey=SCRIPT_PUB_KEY_OP_TRUE))
         tx_withhold.calc_sha256()
+        self.log.info("tx_withhold.hash = "+tx_withhold.hash)
 
         # Our first orphan tx with some outputs to create further orphan txs
         tx_orphan_1 = CTransaction()
