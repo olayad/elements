@@ -475,7 +475,7 @@ class CTransaction(object):
     def serialize_without_witness(self):
         r = b""
         r += struct.pack("<i", self.nVersion)
-        r += struct.pack("B", 1)
+        r += struct.pack("B", 0)
         r += ser_vector(self.vin)
         r += ser_vector(self.vout)
         r += struct.pack("<I", self.nLockTime)

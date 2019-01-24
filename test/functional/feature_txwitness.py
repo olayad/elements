@@ -14,28 +14,47 @@ import pprint
 class TxWitnessTest(BitcoinTestFramework):
     def set_test_params(self):
         self.setup_clean_chain = True
-        self.num_nodes = 1
+        self.num_nodes = 2
 
     def test_transaction_serialization(self):
         node = self.nodes[0]
 
-        # spend money to segwit address
-        unspent = node.listunspent()[0]
-        addr = node.getnewaddress("", "p2sh-segwit")
-        node.sendtoaddress(address=addr, amount=50, subtractfeefromamount=True)
-        node.generate(1)
-        pprint.pprint(node.listunspent())
-        unspent = node.listunspent()[0]
-        addr = node.getnewaddress("", "p2sh-segwit")
+        legacy_addr = self.nodes[0].getnewaddress("", "legacy")
+        p2sh_addr = self.nodes[0].getnewaddress("", "p2sh-segwit")
+        bech32_addr = self.nodes[0].getnewaddress("", "bech32")
+        unknown_addr = self.nodes[1].getnewaddress()
 
+        # directly seed types of utxos required
+        self.nodes[0].generatetoaddress(1, legacy_addr)
+        self.nodes[0].generatetoaddress(1, p2sh_addr)
+        self.nodes[0].generatetoaddress(1, bech32_addr)
+        self.nodes[0].generatetoaddress(101, unknown_addr)
+
+        # grab utxos filtering by age
+        legacy_utxo = self.nodes[0].listunspent(104, 104)[0]
+        p2sh_utxo = self.nodes[0].listunspent(103, 103)[0]
+        bech32_utxo = self.nodes[0].listunspent(102, 102)[0]
+
+        # Non-segwit spend and serialization to nested address
         raw = node.createrawtransaction(
-            [{"txid": unspent["txid"], "vout": 0}],
-            [{addr: "1"}]
+            [{"txid": legacy_utxo["txid"], "vout": legacy_utxo["vout"]}],
+            [{[p2sh_addr: "1"}]
         )
+        nonwit_decoded = node.decoderawtransaction(raw)
+        assert_equal(len(nonwit_decoded["vin"]) , 1)
+        assert('txinwitness' not in nonwit_decoded["vin"][0])
         pprint.pprint(node.decoderawtransaction(raw))
+
+        # Cross-check python serialization
         rawtx = CTransaction()
         rawtx.deserialize(BytesIO(hex_str_to_bytes(raw)))
-        assert_equal(rawtx.vin[0].prevout.hash, int("0x"+unspent["txid"], 0))
+        assert_equal(rawtx.vin[0].prevout.hash, int("0x"+legacy_utxo["txid"], 0))
+
+        signed_raw = node.signrawtransactionwithwallet(raw)["hex"]
+
+        import pdb
+        pdb.set_trace()
+
 
         tx = CTransaction()
         tx.nVersion = 2
@@ -48,7 +67,7 @@ class TxWitnessTest(BitcoinTestFramework):
         raw = node.signrawtransactionwithwallet(raw)["hex"]
         rawtx = CTransaction()
         rawtx.deserialize(BytesIO(hex_str_to_bytes(raw)))
-        assert_equal(rawtx.vin[0].prevout.hash, int("0x"+unspent["txid"], 0))
+        assert_equal(rawtx.vin[0].prevout.hash, int("0x"+["txid"], 0))
         print(rawtx)
 
         tx = CTransaction()
@@ -63,8 +82,6 @@ class TxWitnessTest(BitcoinTestFramework):
 
 
     def run_test(self):
-        node = self.nodes[0]
-        node.generate(101)
 
         self.test_transaction_serialization()
 
