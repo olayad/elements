@@ -552,6 +552,8 @@ void SetupServerArgs()
     gArgs.AddArg("-parentpubkeyprefix", strprintf("The byte prefix, in decimal, of the parent chain's base58 pubkey address. (default: %d)", 111), false, OptionsCategory::CHAINPARAMS);
     gArgs.AddArg("-parentscriptprefix", strprintf("The byte prefix, in decimal, of the parent chain's base58 script address. (default: %d)", 196), false, OptionsCategory::CHAINPARAMS);
     gArgs.AddArg("-parent_bech32_hrp", strprintf("The human-readable part of the parent chain's bech32 encoding. (default: %s)", "bc"), false, OptionsCategory::CHAINPARAMS);
+    gArgs.AddArg("-ct_bits", strprintf("The default number of hiding bits in a rangeproof. Will be exceeded to cover amounts exceeding the maximum hiding value. (default: %d)", 36), false, OptionsCategory::CHAINPARAMS);
+    gArgs.AddArg("-ct_exponent", strprintf("The hiding exponent. (default: %s)", 0), false, OptionsCategory::CHAINPARAMS);
 
     // Add the hidden options
     gArgs.AddHiddenArgs(hidden_args);
