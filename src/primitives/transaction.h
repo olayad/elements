@@ -89,6 +89,7 @@ public:
     COutPoint prevout;
     CScript scriptSig;
     uint32_t nSequence;
+    CAssetIssuance assetIssuance;
 
     //
     // ELEMENTS:
@@ -229,6 +230,9 @@ class CTxOut
 public:
     CAmount nValue;
     CScript scriptPubKey;
+    CConfidentialValue asset_nValue;
+    CConfidentialAsset nAsset;
+    CConfidentialNonce nonce;
 
     CTxOut()
     {

@@ -6,14 +6,15 @@
 
 #include <script/script.h>
 #include <uint256.h>
+#include <primitives/confidential.h>
 
 class CTxInWitness
 {
 public:
     // TODO generalize CScriptWitness into just CWitness
     //TODO(rebase) CA/CT
-    //std::vector<unsigned char> vchIssuanceAmountRangeproof;
-    //std::vector<unsigned char> vchInflationKeysRangeproof;
+    std::vector<unsigned char> vchIssuanceAmountRangeproof;
+    std::vector<unsigned char> vchInflationKeysRangeproof;
     CScriptWitness scriptWitness;
     // Re-use script witness struct to include its own witness
     CScriptWitness m_pegin_witness;
