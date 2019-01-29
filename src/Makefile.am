@@ -356,6 +356,8 @@ libbitcoin_consensus_a_SOURCES = \
   consensus/validation.h \
   hash.cpp \
   hash.h \
+  issuance.h \
+  issuance.cpp \
   prevector.h \
   primitives/block.cpp \
   primitives/block.h \
@@ -400,6 +402,7 @@ libbitcoin_common_a_SOURCES = \
   compressor.cpp \
   core_read.cpp \
   core_write.cpp \
+  issuance.cpp \
   key.cpp \
   key_io.cpp \
   keystore.cpp \
