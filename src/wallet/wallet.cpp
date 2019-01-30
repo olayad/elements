@@ -4832,5 +4832,23 @@ CPubKey CWallet::GetBlindingPubKey(const CScript& script) const
     return CPubKey();
 }
 
+bool CWallet::LoadSpecificBlindingKey(const CScriptID& scriptid, const uint256& key)
+{
+    AssertLockHeld(cs_wallet); // mapSpecificBlindingKeys
+    mapSpecificBlindingKeys[scriptid] = key;
+    return true;
+}
+
+bool CWallet::AddSpecificBlindingKey(const CScriptID& scriptid, const uint256& key)
+{
+    AssertLockHeld(cs_wallet); // mapSpecificBlindingKeys
+    if (!LoadSpecificBlindingKey(scriptid, key))
+        return false;
+
+    if (!fFileBacked)
+        return true;
+    return CWalletDB(strWalletFile).WriteSpecificBlindingKey(scriptid, key);
+}
+
 // END ELEMENTS
 //

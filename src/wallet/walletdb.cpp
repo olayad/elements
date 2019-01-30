@@ -194,6 +194,16 @@ bool WalletBatch::WriteOfflineCounter(int counter)
     return WriteIC(std::string("offlinecounter"), counter);
 }
 
+bool WalletBatch::WriteBlindingDerivationKey(const uint256& key)
+{
+     return Write(std::string("blindingderivationkey"), key);
+}
+
+bool WalletBatch::WriteSpecificBlindingKey(const CScriptID& scriptid, const uint256& key)
+{
+    return Write(make_pair(std::string("specificblindingkey"), scriptid), key);
+}
+
 CAmount WalletBatch::GetAccountCreditDebit(const std::string& strAccount)
 {
     std::list<CAccountingEntry> entries;
@@ -558,6 +568,23 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
             std::string descriptor;
             ssValue >> descriptor;
             pwallet->offline_desc = descriptor;
+        else if (strType == "blindingderivationkey")
+        {
+            assert(pwallet->blinding_derivation_key.IsNull());
+            uint256 key;
+            ssValue >> key;
+            pwallet->blinding_derivation_key = key;
+        }
+        else if (strType == "specificblindingkey")
+        {
+            CScriptID scriptid;
+            ssKey >> scriptid;
+            uint256 key;
+            ssValue >> key;
+            if (!pwallet->LoadSpecificBlindingKey(scriptid, key)) {
+                strErr = "Error reading wallet database: LoadSpecificBlindingKey failed";
+                return false;
+            }
         } else if (strType != "bestblock" && strType != "bestblock_nomerkle") {
             wss.m_unknown_records++;
         }
@@ -677,6 +704,17 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
     ListAccountCreditDebit("*", pwallet->laccentries);
     for (CAccountingEntry& entry : pwallet->laccentries) {
         pwallet->wtxOrdered.insert(make_pair(entry.nOrderPos, CWallet::TxPair(nullptr, &entry)));
+    }
+
+    if (result == DB_LOAD_OK && pwallet->blinding_derivation_key.IsNull()) {
+        CKey key;
+        key.MakeNewKey(true);
+        uint256 keybin;
+        memcpy(keybin.begin(), key.begin(), key.size());
+        pwallet->blinding_derivation_key = keybin;
+        if (!WriteBlindingDerivationKey(pwallet->blinding_derivation_key)) {
+            result = DB_LOAD_FAIL;
+        }
     }
 
     return result;
