@@ -93,19 +93,16 @@ size_t GetNumIssuances(const CTransaction& tx)
 }
 
 // Helper function for VerifyAmount(), not exported
-static bool VerifyIssuanceAmount(secp256k1_pedersen_commitment& commit, secp256k1_generator& gen,
-                    const CAsset& asset, const CConfidentialValue& value, const std::vector<unsigned char>& vchRangeproof,
-                    std::vector<CCheck*>* pvChecks, const bool cacheStore)
+static bool VerifyIssuanceAmount(secp256k1_pedersen_commitment& value_commit, secp256k1_generator& asset_gen,
+                    const CAsset& asset, const CConfidentialValue& value, const std::vector<unsigned char>& rangeproof,
+                    std::vector<CCheck*>* checks, const bool store_result)
 {
     // This is used to add in the explicit values
-    unsigned char explBlinds[32];
-    memset(explBlinds, 0, sizeof(explBlinds));
+    unsigned char explicit_blinds[32];
+    memset(explicit_blinds, 0, sizeof(explicit_blinds));
     int ret;
 
-    assert(value.IsValid());
-
-    // Generate asset generator
-    ret = secp256k1_generator_generate(secp256k1_ctx_verify_amounts, &gen, asset.begin());
+    ret = secp256k1_generator_generate(secp256k1_ctx_verify_amounts, &asset_gen, asset.begin());
     assert(ret == 1);
 
     // Build value commitment
@@ -113,28 +110,27 @@ static bool VerifyIssuanceAmount(secp256k1_pedersen_commitment& commit, secp256k
         if (!MoneyRange(value.GetAmount()) || value.GetAmount() == 0) {
             return false;
         }
-        if (!vchRangeproof.empty()) {
+        if (!rangeproof.empty()) {
             return false;
         }
 
 
-        ret = secp256k1_pedersen_commit(secp256k1_ctx_verify_amounts, &commit, explBlinds, value.GetAmount(), &gen);
-        // The explBlinds are all 0, and the amount is not 0. So secp256k1_pedersen_commit does not fail.
+        ret = secp256k1_pedersen_commit(secp256k1_ctx_verify_amounts, &value_commit, explicit_blinds, value.GetAmount(), &asset_gen);
+        // The explicit_blinds are all 0, and the amount is not 0. So secp256k1_pedersen_commit does not fail.
         assert(ret == 1);
-    }
-    else {
-        assert(value.IsCommitment());
+    } else if (value.IsCommitment()) {
         // Verify range proof
         std::vector<unsigned char> vchAssetCommitment(CConfidentialAsset::nExplicitSize);
-        secp256k1_generator_serialize(secp256k1_ctx_verify_amounts, &vchAssetCommitment[0], &gen);
-        if (QueueCheck(pvChecks, new CRangeCheck(&value, vchRangeproof, vchAssetCommitment, CScript(), cacheStore)) != SCRIPT_ERR_OK) {
+        secp256k1_generator_serialize(secp256k1_ctx_verify_amounts, vchAssetCommitment.data(), &asset_gen);
+        if (QueueCheck(checks, new CRangeCheck(&value, rangeproof, vchAssetCommitment, CScript(), store_result)) != SCRIPT_ERR_OK) {
             return false;
         }
 
-        // Here we have value.IsCommitment() == true
-        if (secp256k1_pedersen_commitment_parse(secp256k1_ctx_verify_amounts, &commit, &value.vchCommitment[0]) != 1) {
+        if (secp256k1_pedersen_commitment_parse(secp256k1_ctx_verify_amounts, &value_commit, value.vchCommitment.data()) != 1) {
             return false;
         }
+    } else {
+        return false;
     }
 
     return true;
