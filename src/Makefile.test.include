@@ -92,7 +92,8 @@ BITCOIN_TESTS =\
   test/validation_block_tests.cpp \
   test/versionbits_tests.cpp \
   test/pegin_spent_tests.cpp \
-  test/pegin_witness_tests.cpp
+  test/pegin_witness_tests.cpp \
+  test/blind_tests.cpp
 # ELEMENTS IN THE END
 
 if ENABLE_WALLET
