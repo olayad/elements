@@ -444,6 +444,7 @@ public:
         fImmatureWatchCreditCached = false;
         fDebitCached = false;
         fChangeCached = false;
+        WipeUnknownBlindingData();
     }
 
     void BindWallet(CWallet *pwalletIn)
@@ -491,10 +492,46 @@ public:
     std::set<uint256> GetConflicts() const;
 
     // ELEMENTS:
-    //! Returns either the value out (if it is known) or -1
-    CAmount GetOutputValueOut(unsigned int nOut) const;
 
-    CAsset GetOutputAsset(unsigned int nOut) const;
+private:
+    /* Computes, stores and returns the unblinded info, or retrieves if already computed previously.
+    * @param[in]    map_index - Where to store the blinding data. Issuance data is stored after the output data, with additional index offset calculated via GetPseudoInputOffset
+    * @param[in]    vchRangeproof - The rangeproof to unwind
+    * @param[in]    conf_value - The value to unblind
+    * @param[in]    conf_asset - The asset to unblind
+    * @param[in]    nonce - The nonce used to ECDH with the blinding key. This is null for issuance as blinding key is directly used as nonce
+    * @param[in]    scriptPubKey - The script being committed to by the rangeproof
+    * @param[out]   blinding_pubkey - Pointer to the recovered pubkey of the destination
+    * @param[out]   value - Pointer to the CAmount where the unblinded amount will be stored
+    * @param[out]   value_factor - Pointer to the recovered value blinding factor of the output
+    * @param[out]   asset - Pointer to the recovered underlying asset type
+    * @param[out]   asset_factor - Pointer to the recovered asset blinding factor of the output
+    */
+    void GetBlindingData(const unsigned int map_index, const std::vector<unsigned char>& vchRangeproof, const CConfidentialValue& conf_value, const CConfidentialAsset& conf_asset, const CConfidentialNonce nonce, const CScript& scriptPubKey, CPubKey* blinding_pubkey, CAmount* value, uint256* value_factor, CAsset* asset, uint256* asset_factor);
+    void WipeUnknownBlindingData() const;
+
+public:
+    // For use in wallet transaction creation to remember 3rd party values
+    // Unneeded for issuance.
+    void SetBlindingData(const unsigned int output_index, const CPubKey& blinding_pubkey, const CAmount value, const uint256& value_factor, const CAsset& asset, const uint256& asset_factor);
+
+    //! Returns either the value out (if it is known) or -1
+    CAmount GetOutputValueOut(unsigned int ouput_index) const;
+
+    //! Returns either the blinding factor (if it is to us) or 0
+    uint256 GetOutputBlindingFactor(unsigned int output_index) const;
+    uint256 GetOutputAssetBlindingFactor(unsigned int output_index) const;
+    //! Returns the underlying asset type, or 0 if unknown
+    CAsset GetOutputAsset(unsigned int output_index) const;
+    // ! Returns receiver's blinding pubkey
+    CPubKey GetOutputBlindingPubKey(unsigned int output_index) const;
+    //! Get the issuance blinder for either the asset itself or the issuing tokens
+    uint256 GetIssuanceBlindingFactor(unsigned int input_index, bool reissuance_token) const;
+    //! Get the issuance amount for either the asset itself or the issuing tokens
+    CAmount GetIssuanceAmount(unsigned int input_index, bool reissuance_token) const;
+
+    //! Get the mapValue offset for a specific vin index and type of issuance pseudo-input
+    unsigned int GetPseudoInputOffset(unsigned int input_index, bool reissuance_token) const;
 };
 
 class COutput
@@ -851,6 +888,9 @@ public:
 
     //The offline xpub aka `bitcoin_xpub` in the wallet set by `initpegoutwallet`
     CExtPubKey offline_xpub;
+
+    // Master derivation blinding key
+    uint256 blinding_derivation_key;
 
     // END ELEMENTS
 
@@ -1239,6 +1279,13 @@ public:
     bool SetOfflineCounter(int counter);
     bool SetOfflineDescriptor(const std::string& offline_desc_in);
     bool SetOfflineXPubKey(const CExtPubKey& offline_xpub_in);
+
+    void ComputeBlindingData(const CConfidentialValue& conf_value, const CConfidentialAsset& conf_asset, const CConfidentialNonce& nonce, const CScript& scriptPubKey, const std::vector<unsigned char>& vchRangeproof, CAmount& value, CPubKey& blinding_pubkey, uint256& value_factor, CAsset& asset, uint256& asset_factor) const;
+
+    // First looks in imported blinding key store, then derives on its own
+    CKey GetBlindingKey(const CScript* script) const;
+    // Pubkey accessor for GetBlindingKey
+    CPubKey GetBlindingPubKey(const CScript& script) const;
 };
 
 /** A key allocated from the key pool. */
