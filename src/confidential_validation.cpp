@@ -136,7 +136,7 @@ static bool VerifyIssuanceAmount(secp256k1_pedersen_commitment& value_commit, se
     return true;
 }
 
-bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::vector<CCheck*>* pvChecks, const bool cacheStore)
+bool VerifyAmounts(const std::vector<CTxOut&>& inputs, const CTransaction& tx, std::vector<CCheck*>* checks, const bool store_result)
 {
     assert(!tx.IsCoinBase());
 
@@ -148,8 +148,7 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
     secp256k1_pedersen_commitment commit;
     secp256k1_generator gen;
     // This is used to add in the explicit values
-    unsigned char explBlinds[32];
-    memset(explBlinds, 0, sizeof(explBlinds));
+    unsigned char explicit_blinds[32] = {0};
     int ret;
 
     uint256 wtxid(tx.GetHashWithWitness());
@@ -158,16 +157,14 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
     // Proofs must be constructed with the list being in
     // order of input and non-null issuance pseudo-inputs, with
     // input first, asset issuance second, reissuance token third.
-    std::vector<secp256k1_generator> targetGenerators;
-    targetGenerators.reserve(tx.vin.size() + GetNumIssuances(tx));
+    std::vector<secp256k1_generator> target_generators;
+    target_generators.reserve(tx.vin.size() + GetNumIssuances(tx));
 
     // Tally up value commitments, check balance
     for (size_t i = 0; i < tx.vin.size(); ++i)
     {
-        // Assumes IsValidPeginWitness has been called successfully
-        const CTxOut out = tx.vin[i].m_is_pegin ? GetPeginOutputFromWitness(tx.wit.vtxinwit[i].m_pegin_witness) : cache.GetOutputFor(tx.vin[i]);
-        const CConfidentialValue& val = out.nValue;
-        const CConfidentialAsset& asset = out.nAsset;
+        const CConfidentialValue& val = inputs[i].nValue;
+        const CConfidentialAsset& asset = inputs[i].nAsset;
 
         if (val.IsNull() || asset.IsNull())
             return false;
@@ -184,14 +181,14 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
             return false;
         }
 
-        targetGenerators.push_back(gen);
+        target_generators.push_back(gen);
 
         if (val.IsExplicit()) {
             if (!MoneyRange(val.GetAmount()))
                 return false;
 
             // Fails if val.GetAmount() == 0
-            if (secp256k1_pedersen_commit(secp256k1_ctx_verify_amounts, &commit, explBlinds, val.GetAmount(), &gen) != 1)
+            if (secp256k1_pedersen_commit(secp256k1_ctx_verify_amounts, &commit, explicit_blinds, val.GetAmount(), &gen) != 1)
                 return false;
         } else if (val.IsCommitment()) {
             if (secp256k1_pedersen_commitment_parse(secp256k1_ctx_verify_amounts, &commit, &val.vchCommitment[0]) != 1)
@@ -263,10 +260,10 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
             if (i >= tx.wit.vtxinwit.size()) {
                 return false;
             }
-            if (!VerifyIssuanceAmount(commit, gen, assetID, issuance.nAmount, tx.wit.vtxinwit[i].vchIssuanceAmountRangeproof, pvChecks, cacheStore)) {
+            if (!VerifyIssuanceAmount(commit, gen, assetID, issuance.nAmount, tx.wit.vtxinwit[i].vchIssuanceAmountRangeproof, checks, store_result)) {
                 return false;
             }
-            targetGenerators.push_back(gen);
+            target_generators.push_back(gen);
             vData.push_back(commit);
             vpCommitsIn.push_back(p);
             p++;
@@ -290,10 +287,10 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
             if (i >= tx.wit.vtxinwit.size()) {
                 return false;
             }
-            if (!VerifyIssuanceAmount(commit, gen, assetTokenID, issuance.nInflationKeys, tx.wit.vtxinwit[i].vchInflationKeysRangeproof, pvChecks, cacheStore)) {
+            if (!VerifyIssuanceAmount(commit, gen, assetTokenID, issuance.nInflationKeys, tx.wit.vtxinwit[i].vchInflationKeysRangeproof, checks, store_result)) {
                 return false;
             }
-            targetGenerators.push_back(gen);
+            target_generators.push_back(gen);
             vData.push_back(commit);
             vpCommitsIn.push_back(p);
             p++;
@@ -337,8 +334,8 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
                 }
             }
 
-            ret = secp256k1_pedersen_commit(secp256k1_ctx_verify_amounts, &commit, explBlinds, val.GetAmount(), &gen);
-            // The explBlinds are all 0, and the amount is not 0. So secp256k1_pedersen_commit does not fail.
+            ret = secp256k1_pedersen_commit(secp256k1_ctx_verify_amounts, &commit, explicit_blinds, val.GetAmount(), &gen);
+            // The explicit_blinds are all 0, and the amount is not 0. So secp256k1_pedersen_commit does not fail.
             assert(ret == 1);
         }
         else if (val.IsCommitment()) {
@@ -354,7 +351,7 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
     }
 
     // Check balance
-    if (QueueCheck(pvChecks, new CBalanceCheck(vData, vpCommitsIn, vpCommitsOut)) != SCRIPT_ERR_OK) {
+    if (QueueCheck(checks, new CBalanceCheck(vData, vpCommitsIn, vpCommitsOut)) != SCRIPT_ERR_OK) {
         return false;
     }
 
@@ -378,7 +375,7 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
         if (!ptxoutwit) {
             return false;
         }
-        if (QueueCheck(pvChecks, new CRangeCheck(&val, ptxoutwit->vchRangeproof, vchAssetCommitment, tx.vout[i].scriptPubKey, cacheStore)) != SCRIPT_ERR_OK) {
+        if (QueueCheck(checks, new CRangeCheck(&val, ptxoutwit->vchRangeproof, vchAssetCommitment, tx.vout[i].scriptPubKey, store_result)) != SCRIPT_ERR_OK) {
             return false;
         }
     }
@@ -404,7 +401,7 @@ bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::ve
         if (secp256k1_surjectionproof_parse(secp256k1_ctx_verify_amounts, &proof, &ptxoutwit->vchSurjectionproof[0], ptxoutwit->vchSurjectionproof.size()) != 1)
             return false;
 
-        if (QueueCheck(pvChecks, new CSurjectionCheck(proof, targetGenerators, gen, wtxid, cacheStore)) != SCRIPT_ERR_OK) {
+        if (QueueCheck(checks, new CSurjectionCheck(proof, target_generators, gen, wtxid, store_result)) != SCRIPT_ERR_OK) {
             return false;
         }
     }

@@ -239,6 +239,7 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
                          strprintf("%s: inputs missing/spent", __func__));
     }
 
+    std::vector<CTxOut> spent_inputs;
     for (unsigned int i = 0; i < tx.vin.size(); ++i) {
         const COutPoint &prevout = tx.vin[i].prevout;
         if (tx.vin[i].m_is_pegin) {
@@ -257,7 +258,8 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
             setPeginsSpent.insert(pegin);
 
             // Tally the input amount.
-            const CTxOut out = GetPeginOutputFromWitness(tx.witness.vtxinwit[i].m_pegin_witness);
+            spent_inputs.push_back(GetPeginOutputFromWitness(tx.witness.vtxinwit[i].m_pegin_witness));
+            const CTxOut& out = spent_inputs.back();
             assert(out.nValue.IsExplicit());
             if (!MoneyRange(out.nValue.GetAmount())) {
                 return state.DoS(100, false, REJECT_INVALID, "bad-txns-pegin-inputvalue-outofrange");
@@ -272,6 +274,7 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
                     REJECT_INVALID, "bad-txns-premature-spend-of-coinbase",
                     strprintf("tried to spend coinbase at depth %d", nSpendHeight - coin.nHeight));
             }
+            spent_inputs.push_back(coin.out);
         }
     }
 
@@ -281,7 +284,7 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
     }
 
     // Verify that amounts add up.
-    if (fScriptChecks && !VerifyAmounts(inputs, tx, pvChecks, cacheStore)) {
+    if (fScriptChecks && !VerifyAmounts(spent_inputs, tx, pvChecks, cacheStore)) {
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-in-ne-out", false, "value in != value out");
     }
 

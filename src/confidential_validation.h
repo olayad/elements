@@ -89,7 +89,7 @@ public:
     bool operator()();
 };
 
-bool VerifyAmounts(const CCoinsViewCache& cache, const CTransaction& tx, std::vector<CCheck*>* pvChecks, const bool cacheStore);
+bool VerifyAmounts(const std::vector<CTxOut&>& inputs, const CTransaction& tx, std::vector<CCheck*>* pvChecks, const bool cacheStore);
 
 bool VerifyCoinbaseAmount(const CTransaction& tx, const CAmountMap& mapFees);
 
