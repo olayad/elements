@@ -257,6 +257,7 @@ public:
             READWRITE(nAsset);
             READWRITE(nValue);
             READWRITE(nNonce);
+            READWRITE(scriptPubKey);
         } else {
             CAmount value;
             if (!ser_action.ForRead()) {
@@ -266,8 +267,8 @@ public:
             if (ser_action.ForRead()) {
                 nValue.SetToAmount(value);
             }
+            READWRITE(scriptPubKey);
         }
-        READWRITE(scriptPubKey);
     }
 
     void SetNull()
