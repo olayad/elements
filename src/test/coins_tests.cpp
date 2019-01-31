@@ -160,7 +160,7 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
 
             if (InsecureRandRange(5) == 0 || coin.IsSpent()) {
                 Coin newcoin;
-                newcoin.out.nValue.SetToAmount(InsecureRand32());
+                newcoin.out.nValue = InsecureRand32();
                 newcoin.nHeight = 1;
                 if (InsecureRandRange(16) == 0 && coin.IsSpent()) {
                     newcoin.out.scriptPubKey.assign(1 + InsecureRandBits(6), OP_RETURN);
@@ -301,7 +301,7 @@ BOOST_AUTO_TEST_CASE(updatecoins_simulation_test)
             CMutableTransaction tx;
             tx.vin.resize(1);
             tx.vout.resize(1);
-            tx.vout[0].nValue.SetToAmount(i); //Keep txs unique unless intended to duplicate
+            tx.vout[0].nValue = i; //Keep txs unique unless intended to duplicate
             tx.vout[0].scriptPubKey.assign(InsecureRand32() & 0x3F, 0); // Random sizes so we can test memory usage accounting
             unsigned int height = InsecureRand32();
             Coin old_coin;
@@ -481,7 +481,7 @@ BOOST_AUTO_TEST_CASE(ccoins_serialization)
     ss1 >> cc1;
     BOOST_CHECK_EQUAL(cc1.fCoinBase, false);
     BOOST_CHECK_EQUAL(cc1.nHeight, 203998U);
-    BOOST_CHECK_EQUAL(cc1.out.nValue.GetAmount(), CAmount{60000000000});
+    BOOST_CHECK_EQUAL(cc1.out.nValue.GetAmount(), 60000000000);
     BOOST_CHECK_EQUAL(HexStr(cc1.out.scriptPubKey), HexStr(GetScriptForDestination(CKeyID(uint160(ParseHex("816115944e077fe7c803cfa57f29b36bf87c1d35"))))));
 
     // Good example
@@ -546,7 +546,7 @@ static void SetCoinsValue(CAmount value, Coin& coin)
     coin.Clear();
     assert(coin.IsSpent());
     if (value != PRUNED) {
-        coin.out.nValue.SetToAmount(value);
+        coin.out.nValue = value;
         coin.nHeight = 1;
         assert(!coin.IsSpent());
     }

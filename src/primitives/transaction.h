@@ -245,7 +245,6 @@ public:
     CTxOut()
     {
         SetNull();
-        //nValue.SetToAmount(0);
     }
 
     CTxOut(const CConfidentialAsset& nAssetIn, const CConfidentialValue& nValueIn, CScript scriptPubKeyIn);

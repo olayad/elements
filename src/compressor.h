@@ -98,17 +98,22 @@ public:
         if (!ser_action.ForRead()) {
             if (txout.nValue.IsExplicit()) {
                 uint8_t b = 0;
-                READWRITE(b);
+                if (g_con_elementswitness) {
+                    READWRITE(b);
+                }
                 uint64_t nVal = CompressAmount(txout.nValue.GetAmount());
                 READWRITE(VARINT(nVal));
             } else {
+                assert(g_con_elementswitness);
                 uint8_t b = 1;
                 READWRITE(b);
                 READWRITE(txout.nValue);
             }
         } else {
-            uint8_t type;
-            READWRITE(type);
+            uint8_t type = 0;
+            if (g_con_elementswitness) {
+                READWRITE(type);
+            }
             if (type == 0) {
                 uint64_t nVal = 0;
                 READWRITE(VARINT(nVal));
