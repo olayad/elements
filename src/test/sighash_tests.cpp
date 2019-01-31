@@ -109,7 +109,7 @@ void static RandomTransaction(CMutableTransaction &tx, bool fSingle) {
         txin.nSequence = (InsecureRandBool()) ? InsecureRand32() : (unsigned int)-1;
     }
     for (int out = 0; out < outs; out++) {
-        tx.vout.push_back(CTxOut(CAsset(), 0, CScript()));
+        tx.vout.push_back(CTxOut());
         CTxOut &txout = tx.vout.back();
         txout.nValue = InsecureRandRange(100000000);
         txout.nAsset = Params().GetConsensus().pegged_asset;

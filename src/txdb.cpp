@@ -380,7 +380,7 @@ public:
                 nMaskCode--;
         }
         // txouts themself
-        vout.assign(vAvail.size(), CTxOut(CAsset(), 0, CScript()));
+        vout.assign(vAvail.size(), CTxOut());
         for (unsigned int i = 0; i < vAvail.size(); i++) {
             if (vAvail[i])
                 ::Unserialize(s, CTxOutCompressor(vout[i]));

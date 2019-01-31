@@ -1526,7 +1526,7 @@ public:
     void SerializeOutput(S &s, unsigned int nOutput) const {
         if (fHashSingle && nOutput != nIn)
             // Do not lock-in the txout payee at other indices as txin
-            ::Serialize(s, CTxOut(CAsset(), 0, CScript()));
+            ::Serialize(s, CTxOut());
         else
             ::Serialize(s, txTo.vout[nOutput]);
     }
