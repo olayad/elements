@@ -276,10 +276,6 @@ public:
         nValue.SetNull();
         nNonce.SetNull();
         scriptPubKey.clear();
-
-        if (!g_con_elementswitness) {
-            nValue.SetToAmount(-1);
-        }
     }
 
     bool IsNull() const

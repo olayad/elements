@@ -429,7 +429,7 @@ static void MutateTxAddOutData(CMutableTransaction& tx, const std::string& strIn
 
     std::vector<unsigned char> data;
     CAsset asset(Params().GetConsensus().pegged_asset);
-    
+
     if (vStrInputParts.size()==1) {
         std::string strData = vStrInputParts[0];
         if (!IsHex(strData))
@@ -635,7 +635,7 @@ static void MutateTxSign(CMutableTransaction& tx, const std::string& flagStr)
                 }
                 Coin newcoin;
                 newcoin.out.scriptPubKey = scriptPubKey;
-                newcoin.out.nValue = CConfidentialValue(0);
+                newcoin.out.nValue = 0;
                 if (prevOut.exists("amount")) {
                     newcoin.out.nValue = CConfidentialValue(AmountFromValue(prevOut["amount"]));
                 }

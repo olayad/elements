@@ -129,6 +129,10 @@ public:
      * a 64-bit big-endian integer. */
     CAmount GetAmount() const
     {
+        if (!g_con_elementswitness && IsNull()) {
+            return -1;
+        }
+
         assert(IsExplicit());;
         return ReadBE64(&vchCommitment[1]);
     }

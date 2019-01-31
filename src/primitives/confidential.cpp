@@ -13,6 +13,12 @@ void CConfidentialAsset::SetToAsset(const CAsset& asset)
 
 void CConfidentialValue::SetToAmount(const CAmount amount)
 {
+    if (!g_con_elementswitness && amount == -1) {
+        SetNull();
+        return;
+    }
+    
+    assert(amount >= 0);
     vchCommitment.resize(nExplicitSize);
     vchCommitment[0] = 1;
     WriteBE64(&vchCommitment[1], amount);
