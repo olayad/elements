@@ -414,6 +414,7 @@ void CTxMemPool::addUnchecked(const uint256& hash, const CTxMemPoolEntry &entry,
     vTxHashes.emplace_back(tx.GetWitnessHash(), newit);
     newit->vTxHashesIdx = vTxHashes.size() - 1;
 
+    // ELEMENTS:
     typedef std::pair<uint256, COutPoint> PeginPair;
     for(const PeginPair& it : entry.setPeginsSpent) {
         std::pair<std::map<std::pair<uint256, COutPoint>, uint256>::iterator, bool> ret = mapPeginsSpentToTxid.insert(std::make_pair(it, hash));

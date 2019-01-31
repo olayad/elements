@@ -10,6 +10,8 @@
 #include <uint256.h>
 #include <utilstrencodings.h>
 
+extern bool g_con_elementswitness;
+
 /**
  * Confidential assets, values, and nonces all share enough code in common
  * that it makes sense to define a common abstract base class. */
@@ -93,7 +95,12 @@ public:
 class CConfidentialAsset : public CConfidentialCommitment<33, 10, 11>
 {
 public:
-    CConfidentialAsset() { SetNull(); }
+    CConfidentialAsset() {
+        SetNull();
+        if (!g_con_elementswitness) {
+            SetToAsset(CAsset());
+        }
+    }
     CConfidentialAsset(CAsset asset) { SetToAsset(asset); }
 
     /* An explicit asset identifier is a 256-bit nothing-up-my-sleeve number

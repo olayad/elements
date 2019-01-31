@@ -250,7 +250,7 @@ if test "x$enable_debug" = xyes; then
   # Prefer -Og, fall back to -O0 if that is unavailable.
   AX_CHECK_COMPILE_FLAG(
     [-Og],
-    [[DEBUG_CXXFLAGS="$DEBUG_CXXFLAGS -Og"]],
+    [[DEBUG_CXXFLAGS="$DEBUG_CXXFLAGS -O0"]],
     [AX_CHECK_COMPILE_FLAG([-O0],[[DEBUG_CXXFLAGS="$DEBUG_CXXFLAGS -O0"]],,[[$CXXFLAG_WERROR]])],
     [[$CXXFLAG_WERROR]])
 
