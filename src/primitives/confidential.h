@@ -97,6 +97,8 @@ class CConfidentialAsset : public CConfidentialCommitment<33, 10, 11>
 public:
     CConfidentialAsset() {
         SetNull();
+
+        // Set to dummy asset when not doing CA.
         if (!g_con_elementswitness) {
             SetToAsset(CAsset());
         }

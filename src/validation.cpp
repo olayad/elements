@@ -2095,7 +2095,7 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
             std::vector<CCheck*> vChecks;
             bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks (still consult the cache, though) */
             if (!Consensus::CheckTxInputs(tx, state, view, pindex->nHeight,
-                        setPeginsSpent == NULL ? setPeginsSpentDummy : *setPeginsSpent, 
+                        setPeginsSpent == NULL ? setPeginsSpentDummy : *setPeginsSpent,
                         nScriptCheckThreads ? &vChecks : NULL, fCacheResults, fScriptChecks)) {
                 return error("%s: Consensus::CheckTxInputs: %s, %s", __func__, tx.GetHash().ToString(), FormatStateMessage(state));
             }

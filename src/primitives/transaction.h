@@ -260,11 +260,7 @@ public:
         } else {
             CAmount value;
             if (!ser_action.ForRead()) {
-                if (nValue.IsNull()) {
-                    value = 0; // CTxOut() should be treated as zero value
-                } else {
-                    value = nValue.GetAmount();
-                }
+                value = nValue.GetAmount();
             }
             READWRITE(value);
             if (ser_action.ForRead()) {
@@ -280,6 +276,10 @@ public:
         nValue.SetNull();
         nNonce.SetNull();
         scriptPubKey.clear();
+
+        if (!g_con_elementswitness) {
+            nValue.SetToAmount(-1);
+        }
     }
 
     bool IsNull() const

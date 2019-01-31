@@ -98,6 +98,8 @@ BOOST_FIXTURE_TEST_SUITE(transaction_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(tx_valid)
 {
+    assert(!g_con_elementswitness);
+
     // Read tests from test/data/tx_valid.json
     // Format is an array of arrays
     // Inner arrays are either [ "comment" ]
@@ -183,6 +185,8 @@ BOOST_AUTO_TEST_CASE(tx_valid)
 
 BOOST_AUTO_TEST_CASE(tx_invalid)
 {
+    assert(!g_con_elementswitness);
+
     // Read tests from test/data/tx_invalid.json
     // Format is an array of arrays
     // Inner arrays are either [ "comment" ]

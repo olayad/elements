@@ -193,7 +193,7 @@ Result CreateTransaction(const CWallet* wallet, const uint256& txid, const CCoin
     }
 
     // If the output would become dust, discard it (converting the dust to fee)
-    poutput->nValue.SetToAmount(poutput->nValue.GetAmount() - nDelta);
+    poutput->nValue = poutput->nValue.GetAmount() - nDelta;
     if (poutput->nValue.GetAmount() <= GetDustThreshold(*poutput, GetDiscardRate(*wallet, ::feeEstimator))) {
         wallet->WalletLogPrintf("Bumping fee and discarding dust output\n");
         new_fee += poutput->nValue.GetAmount();
