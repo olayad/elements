@@ -5776,7 +5776,7 @@ UniValue claimpegin(const JSONRPCRequest& request)
 }
 
 // Rewind the outputs to unblinded, and push placeholders for blinding info. Not exported.
-void FillBlinds(CMutableTransaction& tx, std::vector<uint256>& output_value_blinds, std::vector<uint256>& output_asset_blinds, std::vector<CPubKey>& output_pubkeys, std::vector<CKey>& asset_keys, std::vector<CKey>& token_keys) {
+void FillBlinds(CWallet* pwallet, CMutableTransaction& tx, std::vector<uint256>& output_value_blinds, std::vector<uint256>& output_asset_blinds, std::vector<CPubKey>& output_pubkeys, std::vector<CKey>& asset_keys, std::vector<CKey>& token_keys) {
 
     // Resize witness before doing anything
     tx.witness.vtxinwit.resize(tx.vin.size());
@@ -5800,7 +5800,7 @@ void FillBlinds(CMutableTransaction& tx, std::vector<uint256>& output_value_blin
             CAsset asset;
             CAmount amount;
             // This can only be used to recover things like change addresses and self-sends.
-            if (UnblindConfidentialPair(pwalletMain->GetBlindingKey(&tx.vout[nOut].scriptPubKey), tx.vout[nOut].nValue, tx.vout[nOut].nAsset, tx.vout[nOut].nNonce, tx.vout[nOut].scriptPubKey, ptxoutwit->vchRangeproof, amount, blinding_factor, asset, asset_blinding_factor) != 0) {
+            if (UnblindConfidentialPair(pwallet->GetBlindingKey(&tx.vout[nOut].scriptPubKey), tx.vout[nOut].nValue, tx.vout[nOut].nAsset, tx.vout[nOut].nNonce, tx.vout[nOut].scriptPubKey, ptxoutwit->vchRangeproof, amount, blinding_factor, asset, asset_blinding_factor) != 0) {
                 // Wipe out confidential info from output and output witness
                 CScript scriptPubKey = tx.vout[nOut].scriptPubKey;
                 CTxOut newOut(asset, amount, scriptPubKey);
@@ -5808,7 +5808,7 @@ void FillBlinds(CMutableTransaction& tx, std::vector<uint256>& output_value_blin
                 ptxoutwit->SetNull();
 
                 // Mark for re-blinding with same key that deblinded it
-                CPubKey pubkey(pwalletMain->GetBlindingKey(&tx.vout[nOut].scriptPubKey).GetPubKey());
+                CPubKey pubkey(pwallet->GetBlindingKey(&tx.vout[nOut].scriptPubKey).GetPubKey());
                 output_pubkeys.push_back(pubkey);
                 output_value_blinds.push_back(uint256());
                 output_asset_blinds.push_back(uint256());
@@ -5867,12 +5867,12 @@ void FillBlinds(CMutableTransaction& tx, std::vector<uint256>& output_value_blin
                 uint256 blinding_factor;
                 uint256 asset_blinding_factor;
                 CAmount amount;
-                if (UnblindConfidentialPair(pwalletMain->GetBlindingKey(&blindingScript), conf_value, CConfidentialAsset(asset), CConfidentialNonce(), CScript(), vchRangeproof, amount, blinding_factor, asset, asset_blinding_factor) != 0) {
+                if (UnblindConfidentialPair(pwallet->GetBlindingKey(&blindingScript), conf_value, CConfidentialAsset(asset), CConfidentialNonce(), CScript(), vchRangeproof, amount, blinding_factor, asset, asset_blinding_factor) != 0) {
                     // Wipe out confidential info from issuance
                     vchRangeproof.clear();
                     conf_value = CConfidentialValue(amount);
                     // One key blinds both values, single key needed for issuance reveal
-                    issuance_blinding_keys.push_back(pwalletMain->GetBlindingKey(&blindingScript));
+                    issuance_blinding_keys.push_back(pwallet->GetBlindingKey(&blindingScript));
                     continue;
                 } else {
                     // If  unable to unblind, leave it alone in next blinding step
@@ -5883,7 +5883,7 @@ void FillBlinds(CMutableTransaction& tx, std::vector<uint256>& output_value_blin
                 // as user is not "sending" to anyone.
                 // Always assumed we want to blind here.
                 // TODO Signal intent for all blinding via API including replacing nonce commitment
-                issuance_blinding_keys[issuance_blinding_keys.size()-1] = pwalletMain->GetBlindingKey(&blindingScript);
+                issuance_blinding_keys[issuance_blinding_keys.size()-1] = pwallet->GetBlindingKey(&blindingScript);
             } else  {
                 // Null or invalid, don't try anything but append an empty key
                 issuance_blinding_keys.push_back(CKey());
@@ -5894,6 +5894,12 @@ void FillBlinds(CMutableTransaction& tx, std::vector<uint256>& output_value_blin
 
 UniValue blindrawtransaction(const JSONRPCRequest& request)
 {
+    std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
+    CWallet* const pwallet = wallet.get();
+
+    if (!EnsureWalletIsAvailable(pwallet, request.fHelp))
+        return NullUniValue;
+
     if (request.fHelp || (request.params.size() < 1 || request.params.size() > 5))
         throw runtime_error(
             "blindrawtransaction \"hexstring\" ( ignoreblindfail [\"assetcommitment,...\"] blind_issuances \"totalblinder\" )\n"
@@ -5916,18 +5922,6 @@ UniValue blindrawtransaction(const JSONRPCRequest& request)
             "\nResult:\n"
             "\"transaction\"              (string) hex string of the transaction\n"
         );
-
-    if (request.params.size() == 1) {
-        RPCTypeCheck(request.params, boost::assign::list_of(UniValue::VSTR));
-    } else if (request.params.size() == 2){
-        RPCTypeCheck(request.params, boost::assign::list_of(UniValue::VSTR)(UniValue::VBOOL));
-    } else if (request.params.size() == 3){
-        RPCTypeCheck(request.params, boost::assign::list_of(UniValue::VSTR)(UniValue::VBOOL)(UniValue::VARR));
-    } else if (request.params.size() == 4){
-        RPCTypeCheck(request.params, boost::assign::list_of(UniValue::VSTR)(UniValue::VBOOL)(UniValue::VARR)(UniValue::VBOOL));
-    } else {
-        RPCTypeCheck(request.params, boost::assign::list_of(UniValue::VSTR)(UniValue::VBOOL)(UniValue::VARR)(UniValue::VBOOL)(UniValue::VSTR));
-    }
 
     vector<unsigned char> txData(ParseHexV(request.params[0], "argument 1"));
     CDataStream ssData(txData, SER_NETWORK, PROTOCOL_VERSION);
@@ -5963,8 +5957,7 @@ UniValue blindrawtransaction(const JSONRPCRequest& request)
 
     bool blind_issuances = request.params[3].isNull() || request.params[3].get_bool();
 
-    LOCK(pwalletMain->cs_wallet);
-
+    LOCK(pwallet->cs_wallet);
 
     std::vector<uint256> input_blinds;
     std::vector<uint256> input_asset_blinds;
@@ -5978,8 +5971,8 @@ UniValue blindrawtransaction(const JSONRPCRequest& request)
     int n_blinded_ins = 0;
     for (size_t nIn = 0; nIn < tx.vin.size(); nIn++) {
 
-        std::map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.find(tx.vin[nIn].prevout.hash);
-        if (it == pwalletMain->mapWallet.end()) {
+        std::map<uint256, CWalletTx>::iterator it = pwallet->mapWallet.find(tx.vin[nIn].prevout.hash);
+        if (it == pwallet->mapWallet.end()) {
             // For inputs we don't own input assetcommitments for the surjection must be supplied
             if (auxiliary_generators.size() > 0) {
                 input_blinds.push_back(uint256());
@@ -6014,7 +6007,7 @@ UniValue blindrawtransaction(const JSONRPCRequest& request)
     std::vector<CKey> asset_keys;
     std::vector<CKey> token_keys;
     // This fills out issuance blinding data for you from the wallet itself
-    FillBlinds(tx, output_blinds, output_asset_blinds, output_pubkeys, asset_keys, token_keys);
+    FillBlinds(pwallet, tx, output_blinds, output_asset_blinds, output_pubkeys, asset_keys, token_keys);
 
     if (!blind_issuances) {
         asset_keys.clear();
@@ -6046,7 +6039,7 @@ UniValue blindrawtransaction(const JSONRPCRequest& request)
         CTxOut newTxOut(tx.vout.back().nAsset.GetAsset(), 0, CScript() << OP_RETURN);
         tx.vout.push_back(newTxOut);
         numPubKeys++;
-        output_pubkeys.push_back(pwalletMain->GetBlindingPubKey(newTxOut.scriptPubKey));
+        output_pubkeys.push_back(pwallet->GetBlindingPubKey(newTxOut.scriptPubKey));
     } else if (n_blinded_ins == 0 && numPubKeys == 1) {
         if (fIgnoreBlindFail) {
             // Just get rid of the ECDH key in the nonce field and return
