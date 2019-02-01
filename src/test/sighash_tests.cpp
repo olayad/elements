@@ -112,7 +112,6 @@ void static RandomTransaction(CMutableTransaction &tx, bool fSingle) {
         tx.vout.push_back(CTxOut());
         CTxOut &txout = tx.vout.back();
         txout.nValue = InsecureRandRange(100000000);
-        txout.nAsset = Params().GetConsensus().pegged_asset;
         RandomScript(txout.scriptPubKey);
     }
 }
