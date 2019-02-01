@@ -138,8 +138,6 @@ bool IsStandardTx(const CTransaction& tx, std::string& reason)
         }
 
         if (whichType == TX_NULL_DATA) {
-        }
-        if (whichType == TX_NULL_DATA) {
             nDataOut++;
             if (params.GetEnforcePak() &&
                     txout.scriptPubKey.IsPegoutScript(params.ParentGenesisBlockHash()) &&
