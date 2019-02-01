@@ -36,6 +36,9 @@ ToMemPool(const CMutableTransaction& tx)
 
 BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, TestChain100Setup)
 {
+    // Set the global so that we don't have to worry about assets.
+    subsidyAsset = CAsset();
+
     // Make sure skipping validation of transactions that were
     // validated going into the memory pool does not allow
     // double-spends in blocks to pass validation when they should not.
@@ -52,10 +55,12 @@ BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, TestChain100Setup)
         spends[i].vin[0].prevout.hash = m_coinbase_txns[0]->GetHash();
         spends[i].vin[0].prevout.n = 0;
         spends[i].vout.resize(2);
-        spends[i].vout[0].nValue = MAX_MONEY-11*CENT;
+        spends[i].vout[0].nValue = 11*CENT;
         spends[i].vout[0].scriptPubKey = scriptPubKey;
-        spends[i].vout[1].nValue = 11*CENT;
+        spends[i].vout[0].nAsset = policyAsset;;
+        spends[i].vout[1].nValue = m_coinbase_txns[0]->vout[0].nValue.GetAmount() - 11*CENT;
         spends[i].vout[1].scriptPubKey = CScript();
+        spends[i].vout[1].nAsset = policyAsset;;
 
         // Sign:
         std::vector<unsigned char> vchSig;

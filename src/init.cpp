@@ -554,6 +554,7 @@ void SetupServerArgs()
     gArgs.AddArg("-parent_bech32_hrp", strprintf("The human-readable part of the parent chain's bech32 encoding. (default: %s)", "bc"), false, OptionsCategory::CHAINPARAMS);
     gArgs.AddArg("-con_parent_pegged_asset=<hex>", "Asset ID (hex) for pegged asset for when parent chain has CA. (default: 0x00)", false, OptionsCategory::CHAINPARAMS);
     gArgs.AddArg("-feeasset=<hex>", strprintf("Asset ID (hex) for mempool/relay fees (default: %s)", defaultChainParams->GetConsensus().pegged_asset.GetHex()), false, OptionsCategory::CHAINPARAMS);
+    gArgs.AddArg("-subsidyasset=<hex>", strprintf("Asset ID (hex) for the block subsidy (default: %s)", defaultChainParams->GetConsensus().pegged_asset.GetHex()), false, OptionsCategory::CHAINPARAMS);
     gArgs.AddArg("-initialreissuancetokens=<n>", "The amount of reissuance tokens created in the genesis block. (default: 0)", false, OptionsCategory::CHAINPARAMS);
     gArgs.AddArg("-ct_bits", strprintf("The default number of hiding bits in a rangeproof. Will be exceeded to cover amounts exceeding the maximum hiding value. (default: %d)", 36), false, OptionsCategory::CHAINPARAMS);
     gArgs.AddArg("-ct_exponent", strprintf("The hiding exponent. (default: %s)", 0), false, OptionsCategory::CHAINPARAMS);
@@ -1295,6 +1296,7 @@ bool AppInitMain()
 
     // ELEMENTS:
     policyAsset = CAsset(uint256S(gArgs.GetArg("-feeasset", chainparams.GetConsensus().pegged_asset.GetHex())));
+    subsidyAsset = CAsset(uint256S(gArgs.GetArg("-subsidyasset", chainparams.GetConsensus().pegged_asset.GetHex())));
 
     /* Start the RPC server already.  It will be started in "warmup" mode
      * and not really process calls already (but it will signify connections

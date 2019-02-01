@@ -424,7 +424,10 @@ bool VerifyCoinbaseAmount(const CTransaction& tx, const CAmountMap& mapFees) {
         if (!out.nValue.IsExplicit() || !out.nAsset.IsExplicit()) {
             return false;
         }
-        if (!MoneyRange(out.nValue.GetAmount()) || (out.nValue.GetAmount() == 0 && !out.scriptPubKey.IsUnspendable())) {
+        if (!MoneyRange(out.nValue.GetAmount())) {
+            return false;
+        }
+        if (out.nValue.GetAmount() == 0 && !out.scriptPubKey.IsUnspendable()) {
             return false;
         }
         remaining[out.nAsset.GetAsset()] -= out.nValue.GetAmount();

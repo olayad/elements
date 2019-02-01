@@ -40,6 +40,7 @@ const char* GetTxnOutputType(txnouttype t)
     case TX_WITNESS_V0_SCRIPTHASH: return "witness_v0_scripthash";
     case TX_WITNESS_UNKNOWN: return "witness_unknown";
     case TX_TRUE: return "true";
+    case TX_FEE: return "fee";
     }
     return nullptr;
 }
@@ -96,6 +97,11 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<std::v
 
     if (Params().anyonecanspend_aremine && scriptPubKey == CScript() << OP_TRUE) {
         typeRet = TX_TRUE;
+        return true;
+    }
+
+    if (scriptPubKey == CScript()) {
+        typeRet = TX_FEE;
         return true;
     }
 

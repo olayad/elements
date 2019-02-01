@@ -18,6 +18,7 @@
 
 // ELEMENTS:
 CAsset policyAsset;
+CAsset subsidyAsset;
 
 CAmount GetDustThreshold(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
 {
@@ -61,7 +62,7 @@ bool IsDust(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
         return false;
     if (txout.IsFee())
         return false;
-    return (txout.nValue.GetAmount() < GetDustThreshold(txout, minRelayTxFee));
+    return (txout.nValue.GetAmount() < GetDustThreshold(txout, dustRelayFeeIn));
 }
 
 bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType)

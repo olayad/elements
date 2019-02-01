@@ -57,10 +57,10 @@ static void CoinSelection(benchmark::State& state)
         std::set<std::pair<const CWalletTx*, unsigned int> > setCoinsRet;
         CAmountMap nValueRet;
         CAmountMap mapValue;
-        mapValue[Params().GetConsensus().pegged_asset] = 1003 * COIN;
+        mapValue[CAsset()] = 1003 * COIN;
         bool success = wallet.SelectCoinsMinConf(mapValue, 1, 6, 0, vCoins, setCoinsRet, nValueRet);
         assert(success);
-        assert(nValueRet[Params().GetConsensus().pegged_asset] == 1003 * COIN);
+        assert(nValueRet[CAsset()] == 1003 * COIN);
         assert(setCoinsRet.size() == 2);
     }
 }
