@@ -712,7 +712,8 @@ static bool AcceptToMemoryPoolWorker(const CChainParams& chainparams, CTxMemPool
         if (!CheckSequenceLocks(tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &lp))
             return state.DoS(0, false, REJECT_NONSTANDARD, "non-BIP68-final");
 
-        if (!Consensus::CheckTxInputs(tx, state, view, GetSpendHeight(view), setPeginsSpent, NULL, true, true)) {
+        CAmountMap fee_map;
+        if (!Consensus::CheckTxInputs(tx, state, view, GetSpendHeight(view), fee_map, setPeginsSpent, NULL, true, true)) {
             return error("%s: Consensus::CheckTxInputs: %s, %s", __func__, tx.GetHash().ToString(), FormatStateMessage(state));
         }
 
@@ -2073,6 +2074,7 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
     CCheckQueueControl<CCheck> control(fScriptChecks && nScriptCheckThreads ? &scriptcheckqueue : nullptr);
 
     std::vector<int> prevheights;
+    CAmountMap fee_map;
     int nInputs = 0;
     int64_t nSigOpsCost = 0;
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
@@ -2082,7 +2084,6 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
     // ELEMENTS:
     // Used when ConnectBlock() results are unneeded for mempool ejection
     std::set<std::pair<uint256, COutPoint>> setPeginsSpentDummy;
-    CAmountMap mapFees;
 
     for (unsigned int i = 0; i < block.vtx.size(); i++)
     {
@@ -2094,12 +2095,15 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
         {
             std::vector<CCheck*> vChecks;
             bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks (still consult the cache, though) */
-            if (!Consensus::CheckTxInputs(tx, state, view, pindex->nHeight,
+            if (!Consensus::CheckTxInputs(tx, state, view, pindex->nHeight, fee_map,
                         setPeginsSpent == NULL ? setPeginsSpentDummy : *setPeginsSpent,
                         nScriptCheckThreads ? &vChecks : NULL, fCacheResults, fScriptChecks)) {
                 return error("%s: Consensus::CheckTxInputs: %s, %s", __func__, tx.GetHash().ToString(), FormatStateMessage(state));
             }
             control.Add(vChecks);
+
+            if (!MoneyRange(fee_map))
+                return state.DoS(100, error("ConnectBlock(): total block reward overflowed"), REJECT_INVALID, "bad-blockreward-outofrange");
 
             // Check that transaction is BIP68 final
             // BIP68 lock checks (as opposed to nLockTime checks) must
@@ -2145,26 +2149,20 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
         }
         UpdateCoins(tx, view, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
 
-        if (!HasValidFee(tx))
-            return state.DoS(100, error("ConnectBlock(): transaction fee overflowed"), REJECT_INVALID, "bad-fee-outofrange");
-        mapFees += GetFeeMap(tx);
-        if (!MoneyRange(mapFees))
-            return state.DoS(100, error("ConnectBlock(): total block reward overflowed"), REJECT_INVALID, "bad-blockreward-outofrange");
     }
     int64_t nTime3 = GetTimeMicros(); nTimeConnect += nTime3 - nTime2;
     LogPrint(BCLog::BENCH, "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs (%.2fms/blk)]\n", (unsigned)block.vtx.size(), MILLI * (nTime3 - nTime2), MILLI * (nTime3 - nTime2) / block.vtx.size(), nInputs <= 1 ? 0 : MILLI * (nTime3 - nTime2) / (nInputs-1), nTimeConnect * MICRO, nTimeConnect * MILLI / nBlocksTotal);
 
-    CAmountMap mapBounty;
-    mapBounty[Params().GetConsensus().pegged_asset] = GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
+    CAmountMap map_bounty;
+    map_bounty[Params().GetConsensus().pegged_asset] = GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
 
-    CAmountMap blockReward = mapFees + mapBounty;
-    if (!MoneyRange(blockReward))
+    CAmountMap block_reward = fee_map + map_bounty;
+    if (!MoneyRange(block_reward))
         return state.DoS(100, error("ConnectBlock(): total block reward overflowed"), REJECT_INVALID, "bad-blockreward-outofrange");
-    if (!VerifyCoinbaseAmount(*(block.vtx[0]), blockReward)) {
+    if (!VerifyCoinbaseAmount(*(block.vtx[0]), block_reward)) {
         return state.DoS(100, error("ConnectBlock(): coinbase pays too much (limit=%d)",
-                blockReward[policyAsset]), REJECT_INVALID, "bad-cb-amount");
+                block_reward[policyAsset]), REJECT_INVALID, "bad-cb-amount");
     }
-
 
     if (!control.Wait())
         return state.DoS(100, error("%s: CheckQueue failed", __func__), REJECT_INVALID, "block-validation-failed");

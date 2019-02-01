@@ -231,7 +231,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, bool fChe
 }
 
 namespace Consensus {
-bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, std::set<std::pair<uint256, COutPoint>>& setPeginsSpent, std::vector<CCheck*> *pvChecks, const bool cacheStore, bool fScriptChecks)
+bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmountMap& fee_map, std::set<std::pair<uint256, COutPoint>>& setPeginsSpent, std::vector<CCheck*> *pvChecks, const bool cacheStore, bool fScriptChecks)
 {
     // are the actual inputs available?
     if (!inputs.HaveInputs(tx)) {
@@ -240,6 +240,7 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
     }
 
     std::vector<CTxOut> spent_inputs;
+    CAmount nValueIn = 0;
     for (unsigned int i = 0; i < tx.vin.size(); ++i) {
         const COutPoint &prevout = tx.vin[i].prevout;
         if (tx.vin[i].m_is_pegin) {
@@ -260,7 +261,7 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
             // Tally the input amount.
             spent_inputs.push_back(GetPeginOutputFromWitness(tx.witness.vtxinwit[i].m_pegin_witness));
             const CTxOut& out = spent_inputs.back();
-            assert(out.nValue.IsExplicit());
+            nValueIn += out.nValue.GetAmount(); // Non-explicit already filtered by IsValidPeginWitness
             if (!MoneyRange(out.nValue.GetAmount())) {
                 return state.DoS(100, false, REJECT_INVALID, "bad-txns-pegin-inputvalue-outofrange");
             }
@@ -275,6 +276,9 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
                     strprintf("tried to spend coinbase at depth %d", nSpendHeight - coin.nHeight));
             }
             spent_inputs.push_back(coin.out);
+            if (coin.out.nValue.IsExplicit()) {
+                nValueIn += coin.out.nValue.GetAmount();
+            }
         }
     }
 
@@ -283,9 +287,26 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-fee-outofrange");
     }
 
-    // Verify that amounts add up.
-    if (fScriptChecks && !VerifyAmounts(spent_inputs, tx, pvChecks, cacheStore)) {
-        return state.DoS(100, false, REJECT_INVALID, "bad-txns-in-ne-out", false, "value in != value out");
+    if (g_con_elementswitness) {
+        // Verify that amounts add up.
+        if (fScriptChecks && !VerifyAmounts(spent_inputs, tx, pvChecks, cacheStore)) {
+            return state.DoS(100, false, REJECT_INVALID, "bad-txns-in-ne-out", false, "value in != value out");
+        }
+        fee_map += GetFeeMap(tx);
+    } else {
+        const CAmount value_out = tx.GetValueOutMap()[CAsset()];
+        if (nValueIn < value_out) {
+            return state.DoS(100, false, REJECT_INVALID, "bad-txns-in-belowout", false,
+                strprintf("value in (%s) < value out (%s)", FormatMoney(nValueIn), FormatMoney(value_out)));
+        }
+
+        // Tally transaction fees
+        const CAmount txfee_aux = nValueIn - value_out;
+        if (!MoneyRange(txfee_aux)) {
+            return state.DoS(100, false, REJECT_INVALID, "bad-txns-fee-outofrange");
+        }
+
+        fee_map[CAsset()] += txfee_aux;
     }
 
     return true;
