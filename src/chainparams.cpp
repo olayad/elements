@@ -140,6 +140,9 @@ public:
         anyonecanspend_aremine = false;
         enforce_pak = false;
         multi_data_permitted = false;
+        g_signed_blocks = false;
+        g_con_elementswitness = false;
+        g_con_blockheightinheader = false;
 
         /**
          * The message start string is designed to be unlikely to occur in normal data.
