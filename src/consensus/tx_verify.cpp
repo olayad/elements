@@ -282,12 +282,12 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
         }
     }
 
-    // Tally transaction fees
-    if (!HasValidFee(tx)) {
-        return state.DoS(100, false, REJECT_INVALID, "bad-txns-fee-outofrange");
-    }
-
     if (g_con_elementswitness) {
+        // Tally transaction fees
+        if (!HasValidFee(tx)) {
+            return state.DoS(100, false, REJECT_INVALID, "bad-txns-fee-outofrange");
+        }
+
         // Verify that amounts add up.
         if (fScriptChecks && !VerifyAmounts(spent_inputs, tx, pvChecks, cacheStore)) {
             return state.DoS(100, false, REJECT_INVALID, "bad-txns-in-ne-out", false, "value in != value out");
