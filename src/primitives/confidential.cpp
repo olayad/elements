@@ -13,15 +13,15 @@ void CConfidentialAsset::SetToAsset(const CAsset& asset)
 
 void CConfidentialValue::SetToAmount(const CAmount amount)
 {
-    // Core uses -1 for a uninitiated CAmount/CTxOut.
-    // Since negative values don't make sense anyway, we make them all -1 (see GetAmount).
-    // This is because some unit tests rely on negative values.
-    if (!g_con_elementswitness && amount < 0) {
-        SetNull();
-        return;
-    }
-    
-    assert(amount >= 0);
+    //// Core uses -1 for a uninitiated CAmount/CTxOut.
+    //// Since negative values don't make sense anyway, we make them all -1 (see GetAmount).
+    //// This is because some unit tests rely on negative values.
+    //if (!g_con_elementswitness && amount < 0) {
+    //    SetNull();
+    //    return;
+    //}
+    //
+    //assert(amount >= 0);
     vchCommitment.resize(nExplicitSize);
     vchCommitment[0] = 1;
     WriteBE64(&vchCommitment[1], amount);
