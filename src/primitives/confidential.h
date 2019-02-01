@@ -54,7 +54,7 @@ public:
             vchCommitment[0] = version;
         }
         if (vchCommitment.size() > 1) {
-            READWRITE(REF(Span<unsigned char>(vchCommitment.data() + 1, vchCommitment.size())));
+            READWRITE(REF(Span<unsigned char>(vchCommitment.data() + 1, vchCommitment.size()-1)));
         }
     }
 
