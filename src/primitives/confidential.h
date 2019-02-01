@@ -97,13 +97,17 @@ class CConfidentialAsset : public CConfidentialCommitment<33, 10, 11>
 public:
     CConfidentialAsset() {
         SetNull();
+    }
+    CConfidentialAsset(CAsset asset) { SetToAsset(asset); }
+
+    void SetNull() {
+        vchCommitment.clear();
 
         // Set to dummy asset when not doing CA.
         if (!g_con_elementswitness) {
             SetToAsset(CAsset());
         }
     }
-    CConfidentialAsset(CAsset asset) { SetToAsset(asset); }
 
     /* An explicit asset identifier is a 256-bit nothing-up-my-sleeve number
      * that used as auxiliary input to the Pedersen commitment setup to create

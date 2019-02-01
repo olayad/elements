@@ -70,7 +70,7 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName, const std::st
 
     // ELEMENTS:
     // Set policy asset for correct fee output generation
-    policyAsset = CAsset(uint256S(Params().GetConsensus().pegged_asset.GetHex()));
+    policyAsset = CAsset();
 
     noui_connect();
 }

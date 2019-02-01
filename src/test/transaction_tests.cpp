@@ -349,7 +349,8 @@ BOOST_AUTO_TEST_CASE(test_Get)
     t1.vout[1].nValue = (50+21+22)*CENT - 90*CENT;
     t1.vout[1].scriptPubKey = CScript();
 
-    BOOST_CHECK(GetFeeMap(CTransaction(t1))[CAsset()] == (50+21+22)*CENT - 90*CENT);
+    CAmount fee = GetFeeMap(CTransaction(t1))[CAsset()];
+    BOOST_CHECK(fee == (50+21+22)*CENT - 90*CENT);
     BOOST_CHECK(AreInputsStandard(t1, coins));
     BOOST_CHECK_EQUAL(coins.GetValueIn(t1), (50+21+22)*CENT);
 }
@@ -504,8 +505,7 @@ BOOST_AUTO_TEST_CASE(test_big_witness_transaction) {
 
     for(uint32_t i = 0; i < mtx.vin.size(); i++) {
         std::vector<CScriptCheck*> vChecks;
-        CScriptCheck check(coins[tx.vin[i].prevout.n].out, tx, i, SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS, false, &txdata);
-        vChecks.push_back(&check);
+        vChecks.push_back(new CScriptCheck(coins[tx.vin[i].prevout.n].out, tx, i, SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS, false, &txdata));
         control.Add(vChecks);
     }
 

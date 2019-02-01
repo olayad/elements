@@ -281,6 +281,11 @@ public:
 
     bool IsNull() const
     {
+        if (!g_con_elementswitness) {
+            // Ignore the asset and the nonce in compatibility mode.
+            return nValue.IsNull() && scriptPubKey.empty();
+        }
+
         return nAsset.IsNull() && nValue.IsNull() && nNonce.IsNull() && scriptPubKey.empty();
     }
 
