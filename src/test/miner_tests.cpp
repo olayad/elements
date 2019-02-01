@@ -204,9 +204,6 @@ static void TestPackageSelection(const CChainParams& chainparams, const CScript&
 // NOTE: These tests rely on CreateNewBlock doing its own self-validation!
 BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
 {
-    // Set the global so that we don't have to worry about assets.
-    subsidyAsset = CAsset();
-
     // Note that by default, these tests run with size accounting enabled.
     const auto chainParams = CreateChainParams(CBaseChainParams::MAIN);
     const CChainParams& chainparams = *chainParams;

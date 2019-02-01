@@ -354,7 +354,6 @@ BOOST_AUTO_TEST_CASE(naive_blinding_test)
         BOOST_CHECK(!VerifyAmounts(cache, txtemp));
         BOOST_CHECK(BlindTransaction(t_input_blinds, t_input_asset_blinds, t_input_assets, t_input_amounts, output_blinds, output_asset_blinds, output_pubkeys, vDummy, vDummy, txtemp) == 2);
         BOOST_CHECK(!VerifyAmounts(cache, txtemp));
-        
     }
 }
 BOOST_AUTO_TEST_SUITE_END()

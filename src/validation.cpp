@@ -2154,7 +2154,7 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
     LogPrint(BCLog::BENCH, "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs (%.2fms/blk)]\n", (unsigned)block.vtx.size(), MILLI * (nTime3 - nTime2), MILLI * (nTime3 - nTime2) / block.vtx.size(), nInputs <= 1 ? 0 : MILLI * (nTime3 - nTime2) / (nInputs-1), nTimeConnect * MICRO, nTimeConnect * MILLI / nBlocksTotal);
 
     CAmountMap map_bounty;
-    map_bounty[policyAsset] = GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
+    map_bounty[subsidyAsset] = GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
 
     CAmountMap block_reward = fee_map + map_bounty;
     if (!MoneyRange(block_reward))

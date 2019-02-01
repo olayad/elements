@@ -714,7 +714,8 @@ static void CheckAddCoinBase(CAmount base_value, CAmount cache_value, CAmount mo
     CAmount result_value;
     char result_flags;
     try {
-        CTxOut output(CAsset(), modify_value, CScript());
+        CTxOut output;
+        output.nValue = modify_value;
         test.cache.AddCoin(OUTPOINT.second, Coin(std::move(output), 1, coinbase), coinbase);
         test.cache.SelfTest();
         GetCoinsMapEntry(test.cache.map(), result_value, result_flags);

@@ -6,16 +6,13 @@
 #include <test/data/tx_valid.json.h>
 #include <test/test_bitcoin.h>
 
-#include <chainparams.h>
 #include <clientversion.h>
 #include <checkqueue.h>
-#include <confidential_validation.h>
 #include <consensus/tx_verify.h>
 #include <consensus/validation.h>
 #include <core_io.h>
 #include <key.h>
 #include <keystore.h>
-#include <confidential_validation.h>
 #include <validation.h>
 #include <policy/policy.h>
 #include <script/script.h>
@@ -98,8 +95,6 @@ BOOST_FIXTURE_TEST_SUITE(transaction_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(tx_valid)
 {
-    assert(!g_con_elementswitness);
-
     // Read tests from test/data/tx_valid.json
     // Format is an array of arrays
     // Inner arrays are either [ "comment" ]
@@ -185,8 +180,6 @@ BOOST_AUTO_TEST_CASE(tx_valid)
 
 BOOST_AUTO_TEST_CASE(tx_invalid)
 {
-    assert(!g_con_elementswitness);
-
     // Read tests from test/data/tx_invalid.json
     // Format is an array of arrays
     // Inner arrays are either [ "comment" ]
@@ -346,11 +339,7 @@ BOOST_AUTO_TEST_CASE(test_Get)
     t1.vout.resize(2);
     t1.vout[0].nValue = 90*CENT;
     t1.vout[0].scriptPubKey << OP_1;
-    t1.vout[1].nValue = (50+21+22)*CENT - 90*CENT;
-    t1.vout[1].scriptPubKey = CScript();
 
-    CAmount fee = GetFeeMap(CTransaction(t1))[CAsset()];
-    BOOST_CHECK(fee == (50+21+22)*CENT - 90*CENT);
     BOOST_CHECK(AreInputsStandard(t1, coins));
     BOOST_CHECK_EQUAL(coins.GetValueIn(t1), (50+21+22)*CENT);
 }
