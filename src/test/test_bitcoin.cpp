@@ -58,6 +58,8 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName, const std::st
     SetupNetworking();
     InitSignatureCache();
     InitScriptExecutionCache();
+    InitRangeproofCache();
+    InitSurjectionproofCache();
     fCheckBlockIndex = true;
     // Hack to allow testing of fedpeg args
     if (!fedpegscript.empty()) {
