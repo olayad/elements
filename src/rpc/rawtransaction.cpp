@@ -430,7 +430,7 @@ CMutableTransaction ConstructTransaction(const UniValue& inputs_in, const UniVal
     for (const std::string& name_ : outputs.getKeys()) {
         // ELEMENTS:
         // Asset defaults to policyAsset
-        CAsset asset(policyAsset);
+        CAsset asset(::policyAsset);
         if (!assets.isNull()) {
             if (!find_value(assets, name_).isNull()) {
                 asset = CAsset(ParseHashO(assets, name_));

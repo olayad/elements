@@ -116,7 +116,7 @@ Result CreateTransaction(const CWallet* wallet, const uint256& txid, const CCoin
     }
 
     // calculate the old fee and fee-rate
-    old_fee = wtx.GetDebit(ISMINE_SPENDABLE) - wtx.tx->GetValueOut();
+    old_fee = wtx.GetDebit(ISMINE_SPENDABLE) - GetFeeMap(*wtx.tx)[::policyAsset];
     CFeeRate nOldFeeRate(old_fee, txSize);
     CFeeRate nNewFeeRate;
     // The wallet uses a conservative WALLET_INCREMENTAL_RELAY_FEE value to
@@ -198,7 +198,7 @@ Result CreateTransaction(const CWallet* wallet, const uint256& txid, const CCoin
         wallet->WalletLogPrintf("Bumping fee and discarding dust output\n");
         new_fee += poutput->nValue.GetAmount();
         mtx.vout.erase(mtx.vout.begin() + nOutput);
-        if (mtx.witness.vtxoutwit.size() > nOutput) {
+        if (mtx.witness.vtxoutwit.size() > (size_t)nOutput) {
             mtx.witness.vtxoutwit.erase(mtx.witness.vtxoutwit.begin() + nOutput);
         }
     }
@@ -243,9 +243,11 @@ Result CommitTransaction(CWallet* wallet, const uint256& txid, CMutableTransacti
     mapValue_t mapValue = oldWtx.mapValue;
     mapValue["replaces_txid"] = oldWtx.GetHash().ToString();
 
-    CReserveKey reservekey(wallet);
+    std::vector<std::unique_ptr<CReserveKey>> reservekeys;
+    reservekeys.push_back(std::unique_ptr<CReserveKey>(new CReserveKey(wallet)));
+    //reservekeys.push_back(std::unique_ptr<CReserveKey>(wallet));
     CValidationState state;
-    if (!wallet->CommitTransaction(tx, std::move(mapValue), oldWtx.vOrderForm, oldWtx.strFromAccount, reservekey, g_connman.get(), state)) {
+    if (!wallet->CommitTransaction(tx, std::move(mapValue), oldWtx.vOrderForm, oldWtx.strFromAccount, reservekeys, g_connman.get(), state)) {
         // NOTE: CommitTransaction never returns false, so this should never happen.
         errors.push_back(strprintf("The transaction was rejected: %s", FormatStateMessage(state)));
         return Result::WALLET_ERROR;

@@ -205,7 +205,7 @@ void CreateValueCommitment(CConfidentialValue& conf_value, secp256k1_pedersen_co
     assert(conf_value.IsValid());
 }
 
-size_t GetNumIssuances(const CMutableTransaction& tx)
+size_t GetNumIssuances(const CTransaction& tx)
 {
     unsigned int num_issuances = 0;
     for (unsigned int i = 0; i < tx.vin.size(); i++) {

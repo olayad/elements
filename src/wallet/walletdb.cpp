@@ -196,12 +196,12 @@ bool WalletBatch::WriteOfflineCounter(int counter)
 
 bool WalletBatch::WriteBlindingDerivationKey(const uint256& key)
 {
-     return Write(std::string("blindingderivationkey"), key);
+     return WriteIC(std::string("blindingderivationkey"), key);
 }
 
-bool WalletBatch::WriteSpecificBlindingKey(const CScriptID& scriptid, const uint256& key)
+bool WalletBatch::WriteSpecificBlindingKey(const uint160& scriptid, const uint256& key)
 {
-    return Write(make_pair(std::string("specificblindingkey"), scriptid), key);
+    return WriteIC(std::make_pair(std::string("specificblindingkey"), scriptid), key);
 }
 
 CAmount WalletBatch::GetAccountCreditDebit(const std::string& strAccount)
@@ -568,6 +568,7 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
             std::string descriptor;
             ssValue >> descriptor;
             pwallet->offline_desc = descriptor;
+        }
         else if (strType == "blindingderivationkey")
         {
             assert(pwallet->blinding_derivation_key.IsNull());
@@ -706,14 +707,14 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
         pwallet->wtxOrdered.insert(make_pair(entry.nOrderPos, CWallet::TxPair(nullptr, &entry)));
     }
 
-    if (result == DB_LOAD_OK && pwallet->blinding_derivation_key.IsNull()) {
+    if (result == DBErrors::LOAD_OK && pwallet->blinding_derivation_key.IsNull()) {
         CKey key;
         key.MakeNewKey(true);
         uint256 keybin;
         memcpy(keybin.begin(), key.begin(), key.size());
         pwallet->blinding_derivation_key = keybin;
         if (!WriteBlindingDerivationKey(pwallet->blinding_derivation_key)) {
-            result = DB_LOAD_FAIL;
+            result = DBErrors::LOAD_FAIL;
         }
     }
 

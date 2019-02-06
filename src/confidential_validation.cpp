@@ -3,6 +3,7 @@
 #include <issuance.h>
 #include <pegins.h>
 #include <script/sigcache.h>
+#include <blind.h>
 
 namespace {
 static secp256k1_context *secp256k1_ctx_verify_amounts;
@@ -84,21 +85,6 @@ ScriptError QueueCheck(std::vector<CCheck*>* queue, CCheck* check) {
     ScriptError err = check->GetScriptError();
     delete check;
     return success ? SCRIPT_ERR_OK : err;
-}
-
-size_t GetNumIssuances(const CTransaction& tx) {
-    unsigned int numIssuances = 0;
-    for (unsigned int i = 0; i < tx.vin.size(); i++) {
-        if (!tx.vin[i].assetIssuance.IsNull()) {
-            if (!tx.vin[i].assetIssuance.nAmount.IsNull()) {
-                numIssuances++;
-            }
-            if (!tx.vin[i].assetIssuance.nInflationKeys.IsNull()) {
-                numIssuances++;
-            }
-        }
-    }
-    return numIssuances;
 }
 
 // Helper function for VerifyAmount(), not exported
