@@ -263,6 +263,9 @@ public:
         anyonecanspend_aremine = false;
         enforce_pak = false;
         multi_data_permitted = false;
+        g_signed_blocks = false;
+        g_con_elementswitness = false;
+        g_con_blockheightinheader = false;
 
         pchMessageStart[0] = 0x0b;
         pchMessageStart[1] = 0x11;
@@ -358,6 +361,9 @@ public:
         anyonecanspend_aremine = false;
         enforce_pak = false;
         multi_data_permitted = false;
+        g_signed_blocks = false;
+        g_con_elementswitness = false;
+        g_con_blockheightinheader = false;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0xbf;
