@@ -414,7 +414,8 @@ bool VerifyCoinbaseAmount(const CTransaction& tx, const CAmountMap& mapFees) {
         if (!MoneyRange(out.nValue.GetAmount())) {
             return false;
         }
-        if (out.nValue.GetAmount() == 0 && !out.scriptPubKey.IsUnspendable()) {
+        if (g_con_elementswitness &&
+                out.nValue.GetAmount() == 0 && !out.scriptPubKey.IsUnspendable()) {
             return false;
         }
         remaining[out.nAsset.GetAsset()] -= out.nValue.GetAmount();
