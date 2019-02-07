@@ -188,12 +188,11 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     coinbaseTx.vout.resize(1);
     coinbaseTx.vout[0].scriptPubKey = scriptPubKeyIn;
     coinbaseTx.vout[0].nAsset = policyAsset;
-    coinbaseTx.vout[0].nValue = nFees;
+    coinbaseTx.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
     if (g_con_elementswitness) {
-        CAmount reward = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
-        if(chainparams.GetConsensus().subsidy_asset == policyAsset) {
+        if(chainparams.GetConsensus().subsidy_asset != policyAsset) {
             // Only claim the subsidy if it's the same as the policy asset.
-            coinbaseTx.vout[0].nValue = reward;
+            coinbaseTx.vout[0].nValue = nFees;
         }
         // 0-value outputs must be unspendable
         if (coinbaseTx.vout[0].nValue.GetAmount() == 0) {
