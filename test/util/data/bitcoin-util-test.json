@@ -132,8 +132,8 @@
     ["-create",
      "outaddr=1:13tuJJDR2RgArmgfv6JScSdreahzgc4T6o:garbage"],
     "return_code": 1,
-    "error_txt": "error: TX output missing or too many separators",
-    "description": "Malformed outaddr argument (too many separators). Expected to fail."
+    "error_txt": "error: invalid TX output asset type",
+    "description": "Malformed outaddr argument (bad asset id). Expected to fail."
   },
   { "exec": "./bitcoin-tx",
     "args":

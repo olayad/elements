@@ -269,7 +269,7 @@ static void MutateTxAddOutAddr(CMutableTransaction& tx, const std::string& strIn
     std::vector<std::string> vStrInputParts;
     boost::split(vStrInputParts, strInput, boost::is_any_of(":"));
 
-    if (vStrInputParts.size() != 2)
+    if (vStrInputParts.size() < 2)
         throw std::runtime_error("TX output missing or too many separators");
 
     // Extract and validate VALUE
@@ -284,10 +284,13 @@ static void MutateTxAddOutAddr(CMutableTransaction& tx, const std::string& strIn
     CScript scriptPubKey = GetScriptForDestination(destination);
 
     // extract and validate ASSET
-    std::string strAsset = vStrInputParts[2];
-    CAsset asset(uint256S(strAsset));
-    if (asset.IsNull())
-        throw std::runtime_error("invalid TX output asset type");
+    CAsset asset;
+    if (vStrInputParts.size() > 2) {
+        asset = CAsset(uint256S(vStrInputParts[2]));
+        if (asset.IsNull()) {
+            throw std::runtime_error("invalid TX output asset type");
+        }
+    }
 
     // construct TxOut, append to transaction output list
     CTxOut txout(asset, CConfidentialValue(value), scriptPubKey);
