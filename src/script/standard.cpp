@@ -100,7 +100,8 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<std::v
         return true;
     }
 
-    if (scriptPubKey == CScript()) {
+    // Fee outputs are for elements-style transactions only
+    if (g_con_elementswitness && scriptPubKey == CScript()) {
         typeRet = TX_FEE;
         return true;
     }
