@@ -137,6 +137,7 @@ public:
 
         consensus.genesis_subsidy = 50*COIN;
         consensus.connect_genesis_outputs = false;
+        consensus.subsidy_asset = CAsset();
         anyonecanspend_aremine = false;
         enforce_pak = false;
         multi_data_permitted = false;
@@ -260,6 +261,7 @@ public:
 
         consensus.genesis_subsidy = 50*COIN;
         consensus.connect_genesis_outputs = false;
+        consensus.subsidy_asset = CAsset();
         anyonecanspend_aremine = false;
         enforce_pak = false;
         multi_data_permitted = false;
@@ -358,6 +360,7 @@ public:
 
         consensus.genesis_subsidy = 50*COIN;
         consensus.connect_genesis_outputs = false;
+        consensus.subsidy_asset = CAsset();
         anyonecanspend_aremine = false;
         enforce_pak = false;
         multi_data_permitted = false;
@@ -529,6 +532,9 @@ class CCustomParams : public CRegTestParams {
 
         // No subsidy for custom chains by default
         consensus.genesis_subsidy = args.GetArg("-con_blocksubsidy", 0);
+
+        // Subsidy asset only matters when subsidy > 0
+        consensus.subsidy_asset = CAsset(uint256S(gArgs.GetArg("-subsidyasset", uint256().GetHex())));;
 
         // All non-zero coinbase outputs must go to this scriptPubKey
         std::vector<unsigned char> man_bytes = ParseHex(args.GetArg("-con_mandatorycoinbase", ""));

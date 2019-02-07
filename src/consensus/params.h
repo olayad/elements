@@ -84,6 +84,7 @@ struct Params {
     // ELEMENTS CHAIN PARAMS
     CScript mandatory_coinbase_destination;
     CAmount genesis_subsidy;
+    CAsset subsidy_asset;
     bool connect_genesis_outputs;
     bool has_parent_chain;
     uint256 parentChainPowLimit;

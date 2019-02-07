@@ -1299,7 +1299,6 @@ bool AppInitMain()
 
     // ELEMENTS:
     policyAsset = CAsset(uint256S(gArgs.GetArg("-feeasset", chainparams.GetConsensus().pegged_asset.GetHex())));
-    subsidyAsset = CAsset(uint256S(gArgs.GetArg("-subsidyasset", chainparams.GetConsensus().pegged_asset.GetHex())));
 
     /* Start the RPC server already.  It will be started in "warmup" mode
      * and not really process calls already (but it will signify connections

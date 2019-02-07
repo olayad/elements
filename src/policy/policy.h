@@ -18,7 +18,6 @@ class CTxOut;
 
 // ELEMENTS:
 extern CAsset policyAsset;
-extern CAsset subsidyAsset;
 
 /** Default for -blockmaxweight, which controls the range of block weights the mining code will create **/
 static const unsigned int DEFAULT_BLOCK_MAX_WEIGHT = MAX_BLOCK_WEIGHT - 4000;
