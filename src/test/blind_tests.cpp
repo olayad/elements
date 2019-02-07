@@ -19,6 +19,8 @@ struct ElementsSetup : public TestingSetup {
 
 BOOST_FIXTURE_TEST_SUITE(blind_tests, ElementsSetup)
 
+// TODO: Make deterministic blinding wrapper function, test caching more exactly
+
 BOOST_AUTO_TEST_CASE(naive_blinding_test)
 {
     CKey key1;
@@ -30,7 +32,7 @@ BOOST_AUTO_TEST_CASE(naive_blinding_test)
     CAsset otherID(GetRandHash());
     CAsset unblinded_id;
     uint256 asset_blind;
-    CScript scriptCommit(OP_TRUE);
+    CScript op_true(OP_TRUE);
     std::vector<CKey> vDummy;
 
     unsigned char k1[32] = {1,2,3};
@@ -46,11 +48,16 @@ BOOST_AUTO_TEST_CASE(naive_blinding_test)
     uint256 blind3, blind4, blindDummy;
 
     std::vector<CTxOut> inputs;
-    inputs.push_back(CTxOut(bitcoinID, 11, CScript()));
-    inputs.push_back(CTxOut(bitcoinID, 111, CScript()));
-    inputs.push_back(CTxOut(otherID, 500, CScript()));
+    CTxOut btc_oo(bitcoinID, 11, CScript());
+    CTxOut btc_ooo(bitcoinID, 111, CScript());
+    CTxOut other_fzz(otherID, 500, CScript());
+    CTxOut blind_ozz; // Will be computed later
 
     {
+        inputs.clear();
+        inputs.push_back(btc_oo);
+        inputs.push_back(btc_ooo);
+
         // Build a transaction that spends 2 unblinded coins (11, 111), and produces a single blinded one (100) and fee (22).
         CMutableTransaction tx3;
         tx3.vin.resize(2);
@@ -119,9 +126,9 @@ BOOST_AUTO_TEST_CASE(naive_blinding_test)
         BOOST_CHECK(VerifyAmounts(inputs, tx3, nullptr, false));
 
         CAmount unblinded_amount;
-        BOOST_CHECK(UnblindConfidentialPair(key2, tx3.vout[0].nValue, tx3.vout[0].nAsset, tx3.vout[0].nNonce, scriptCommit, tx3.witness.vtxoutwit[0].vchRangeproof, unblinded_amount, blind3, unblinded_id, asset_blind) == 0);
+        BOOST_CHECK(UnblindConfidentialPair(key2, tx3.vout[0].nValue, tx3.vout[0].nAsset, tx3.vout[0].nNonce, op_true, tx3.witness.vtxoutwit[0].vchRangeproof, unblinded_amount, blind3, unblinded_id, asset_blind) == 0);
         // Saving unblinded_id and asset_blind for later since we need for input
-        BOOST_CHECK(UnblindConfidentialPair(key1, tx3.vout[0].nValue, tx3.vout[0].nAsset, tx3.vout[0].nNonce, scriptCommit, tx3.witness.vtxoutwit[0].vchRangeproof, unblinded_amount, blind3, unblinded_id, asset_blind) == 1);
+        BOOST_CHECK(UnblindConfidentialPair(key1, tx3.vout[0].nValue, tx3.vout[0].nAsset, tx3.vout[0].nNonce, op_true, tx3.witness.vtxoutwit[0].vchRangeproof, unblinded_amount, blind3, unblinded_id, asset_blind) == 1);
         BOOST_CHECK(unblinded_amount == 100);
         BOOST_CHECK(unblinded_id == bitcoinID);
         CAsset temp_asset;
@@ -129,15 +136,20 @@ BOOST_AUTO_TEST_CASE(naive_blinding_test)
         BOOST_CHECK(UnblindConfidentialPair(keyDummy, tx3.vout[2].nValue, tx3.vout[2].nAsset, tx3.vout[2].nNonce, CScript() << OP_RETURN, tx3.witness.vtxoutwit[2].vchRangeproof, unblinded_amount, blindDummy, temp_asset, temp_asset_blinder) == 1);
         BOOST_CHECK(unblinded_amount == 0);
 
-        inputs.push_back(tx3.vout[0]);
-        inputs.push_back(tx3.vout[1]);
-        inputs.push_back(tx3.vout[2]);
+        // Storing for next section
+        BOOST_CHECK(tx3.vout[0].nValue.IsCommitment());
+        BOOST_CHECK(tx3.vout[0].nAsset.IsCommitment());
+        blind_ozz = tx3.vout[0];
 
         tx3.vout[1].nValue = CConfidentialValue(tx3.vout[1].nValue.GetAmount() - 1);
         BOOST_CHECK(!VerifyAmounts(inputs, tx3, nullptr, false));
     }
 
     {
+        inputs.clear();
+        inputs.push_back(btc_ooo);
+        inputs.push_back(blind_ozz);
+
         // Build a transactions that spends an unblinded (111) and blinded (100) coin, and produces only unblinded coins (impossible)
         CMutableTransaction tx4;
         tx4.vin.resize(2);
@@ -172,6 +184,10 @@ BOOST_AUTO_TEST_CASE(naive_blinding_test)
     }
 
     {
+        inputs.clear();
+        inputs.push_back(btc_ooo);
+        inputs.push_back(blind_ozz);
+
         // Build a transactions that spends an unblinded (111) and blinded (100) coin, and produces a blinded (30), unblinded (40), and blinded (50) coin and fee (91)
         CMutableTransaction tx4;
         tx4.vin.resize(2);
@@ -212,42 +228,45 @@ BOOST_AUTO_TEST_CASE(naive_blinding_test)
         BOOST_CHECK(!tx4.vout[0].nValue.IsExplicit());
         BOOST_CHECK(tx4.vout[1].nValue.IsExplicit());
         BOOST_CHECK(!tx4.vout[2].nValue.IsExplicit());
+        // This one broken
         BOOST_CHECK(VerifyAmounts(inputs, tx4, nullptr, false));
 
         CAmount unblinded_amount;
         CAsset asset_out;
         uint256 asset_blinder_out;
-        BOOST_CHECK(UnblindConfidentialPair(key1, tx4.vout[0].nValue, tx4.vout[0].nAsset, tx4.vout[0].nNonce, scriptCommit, tx4.witness.vtxoutwit[0].vchRangeproof, unblinded_amount, blind4, asset_out, asset_blinder_out) == 0);
-        BOOST_CHECK(UnblindConfidentialPair(key2, tx4.vout[0].nValue, tx4.vout[0].nAsset, tx4.vout[0].nNonce, scriptCommit, tx4.witness.vtxoutwit[0].vchRangeproof, unblinded_amount, blind4, asset_out, asset_blinder_out) == 1);
+        BOOST_CHECK(UnblindConfidentialPair(key1, tx4.vout[0].nValue, tx4.vout[0].nAsset, tx4.vout[0].nNonce, op_true, tx4.witness.vtxoutwit[0].vchRangeproof, unblinded_amount, blind4, asset_out, asset_blinder_out) == 0);
+        BOOST_CHECK(UnblindConfidentialPair(key2, tx4.vout[0].nValue, tx4.vout[0].nAsset, tx4.vout[0].nNonce, op_true, tx4.witness.vtxoutwit[0].vchRangeproof, unblinded_amount, blind4, asset_out, asset_blinder_out) == 1);
         BOOST_CHECK(unblinded_amount == 30);
         BOOST_CHECK(asset_out == unblinded_id);
-        BOOST_CHECK(UnblindConfidentialPair(key2, tx4.vout[2].nValue, tx4.vout[2].nAsset, tx4.vout[2].nNonce, scriptCommit, tx4.witness.vtxoutwit[2].vchRangeproof, unblinded_amount, blind4, asset_out, asset_blinder_out) == 1);
+        BOOST_CHECK(UnblindConfidentialPair(key2, tx4.vout[2].nValue, tx4.vout[2].nAsset, tx4.vout[2].nNonce, op_true, tx4.witness.vtxoutwit[2].vchRangeproof, unblinded_amount, blind4, asset_out, asset_blinder_out) == 1);
         BOOST_CHECK(asset_out == unblinded_id);
         BOOST_CHECK(unblinded_amount == 50);
+
+        // Commit to the wrong script in the rangeproof
+        BOOST_CHECK(UnblindConfidentialPair(key2, tx4.vout[2].nValue, tx4.vout[2].nAsset, tx4.vout[2].nNonce, CScript() << OP_FALSE, tx4.witness.vtxoutwit[2].vchRangeproof, unblinded_amount, blind4, asset_out, asset_blinder_out) == 0);
 
         // Make invalid public keys in nonce commitment, first of right size
         tx4.vout[2].nNonce.vchCommitment = std::vector<unsigned char>(33, 0);
         tx4.vout[2].nNonce.vchCommitment[0] = 0x03;
-        BOOST_CHECK(UnblindConfidentialPair(key2, tx4.vout[2].nValue, tx4.vout[2].nAsset, tx4.vout[2].nNonce, scriptCommit, tx4.witness.vtxoutwit[2].vchRangeproof, unblinded_amount, blind4, asset_out, asset_blinder_out) == 0);
+        BOOST_CHECK(UnblindConfidentialPair(key2, tx4.vout[2].nValue, tx4.vout[2].nAsset, tx4.vout[2].nNonce, op_true, tx4.witness.vtxoutwit[2].vchRangeproof, unblinded_amount, blind4, asset_out, asset_blinder_out) == 0);
 
         // Next, leading byte claiming to be 33 bytes in size
         tx4.vout[2].nNonce.vchCommitment.resize(1);
-        BOOST_CHECK(UnblindConfidentialPair(key2, tx4.vout[2].nValue, tx4.vout[2].nAsset, tx4.vout[2].nNonce, scriptCommit, tx4.witness.vtxoutwit[2].vchRangeproof, unblinded_amount, blind4, asset_out, asset_blinder_out) == 0);
+        BOOST_CHECK(UnblindConfidentialPair(key2, tx4.vout[2].nValue, tx4.vout[2].nAsset, tx4.vout[2].nNonce, op_true, tx4.witness.vtxoutwit[2].vchRangeproof, unblinded_amount, blind4, asset_out, asset_blinder_out) == 0);
 
-        // Last, blank
+        // Last, blank nonce commitment
         tx4.vout[2].nNonce.vchCommitment.clear();
-        BOOST_CHECK(UnblindConfidentialPair(key2, tx4.vout[2].nValue, tx4.vout[2].nAsset, tx4.vout[2].nNonce, scriptCommit, tx4.witness.vtxoutwit[2].vchRangeproof, unblinded_amount, blind4, asset_out, asset_blinder_out) == 0);
-
-        inputs.push_back(tx4.vout[0]);
-        inputs.push_back(tx4.vout[1]);
-        inputs.push_back(tx4.vout[2]);
-        inputs.push_back(tx4.vout[3]);
+        BOOST_CHECK(UnblindConfidentialPair(key2, tx4.vout[2].nValue, tx4.vout[2].nAsset, tx4.vout[2].nNonce, op_true, tx4.witness.vtxoutwit[2].vchRangeproof, unblinded_amount, blind4, asset_out, asset_blinder_out) == 0);
 
         tx4.vout[3].nValue = CConfidentialValue(tx4.vout[3].nValue.GetAmount() - 1);
         BOOST_CHECK(!VerifyAmounts(inputs, tx4, nullptr, false));
     }
 
     {
+        inputs.clear();
+        inputs.push_back(blind_ozz);
+        inputs.push_back(other_fzz);
+
         // Spends 100 blinded bitcoin, 500 of unblinded "other"
         CMutableTransaction tx5;
         tx5.vin.resize(0);
@@ -287,7 +306,7 @@ BOOST_AUTO_TEST_CASE(naive_blinding_test)
 
         CMutableTransaction txtemp(tx5);
 
-        // No blinding keys for fees, bails out blinding nothing, still valid due to imbalance
+        // No blinding keys for fees, bails out blinding nothing, still invalid due to imbalance
         BOOST_CHECK(BlindTransaction(input_blinds, input_asset_blinds, input_assets, input_amounts, output_blinds, output_asset_blinds, output_pubkeys, vDummy, vDummy, txtemp) == -1);
         BOOST_CHECK(!VerifyAmounts(inputs, txtemp, nullptr, false));
         // Last will be implied blank keys
@@ -323,6 +342,7 @@ BOOST_AUTO_TEST_CASE(naive_blinding_test)
         t_input_assets = input_assets;
         t_input_amounts = input_amounts;
         txtemp.vin.resize(1);
+        inputs.resize(1);
         t_input_blinds.resize(1);
         t_input_asset_blinds.resize(1);
         t_input_assets.resize(1);
