@@ -133,6 +133,7 @@ static bool VerifyIssuanceAmount(secp256k1_pedersen_commitment& value_commit, se
 
 bool VerifyAmounts(const std::vector<CTxOut>& inputs, const CTransaction& tx, std::vector<CCheck*>* checks, const bool store_result) {
     assert(!tx.IsCoinBase());
+    assert(inputs.size() == tx.vin.size());
 
     std::vector<secp256k1_pedersen_commitment> vData;
     std::vector<secp256k1_pedersen_commitment *> vpCommitsIn, vpCommitsOut;
