@@ -262,7 +262,9 @@ void TxToUniv(const CTransaction& tx, const uint256& hashBlock, UniValue& entry,
         } else {
             out.pushKV("valuecommitment", txout.nValue.GetHex());
         }
-        out.pushKV("assetcommitment", txout.nAsset.GetHex());
+        if (g_con_elementswitness){
+            out.pushKV("assetcommitment", txout.nAsset.GetHex());
+        }
         out.pushKV("n", (int64_t)i);
 
         UniValue o(UniValue::VOBJ);
