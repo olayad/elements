@@ -613,7 +613,7 @@ static UniValue sendtoaddress(const JSONRPCRequest& request)
         strasset = request.params[8].get_str();
     }
     CAsset asset = GetAssetFromString(strasset);
-    if (asset.IsNull()) {
+    if (asset.IsNull() && g_con_elementswitness) {
         throw JSONRPCError(RPC_WALLET_ERROR, strprintf("Unknown label and invalid asset hex: %s", asset.GetHex()));
     }
 
