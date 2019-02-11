@@ -1300,9 +1300,13 @@ static UniValue sendmany(const JSONRPCRequest& request)
     }
 
     UniValue assets;
-    if (request.params.size() > 8 && !request.params[8].isNull()) {
-        if (strAccount != "")
+    if (!request.params[8].isNull()) {
+        if (strAccount != "") {
            throw JSONRPCError(RPC_TYPE_ERROR, "Accounts can not be used with assets.");
+        }
+        if (!g_con_elementswitness) {
+            throw JSONRPCError(RPC_TYPE_ERROR, "Asset argument cannot be given for Bitcoin serialization.");
+        }
         assets = request.params[8].get_obj();
     }
 
@@ -1323,7 +1327,7 @@ static UniValue sendmany(const JSONRPCRequest& request)
             strasset = assets[name_].get_str();
         }
         CAsset asset = GetAssetFromString(strasset);
-        if (asset.IsNull()) {
+        if (asset.IsNull() && g_con_elementswitness) {
             throw JSONRPCError(RPC_WALLET_ERROR, strprintf("Unknown label and invalid asset hex: %s", asset.GetHex()));
         }
 
