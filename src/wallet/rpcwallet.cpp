@@ -141,8 +141,12 @@ static void WalletTxToJSON(const CWalletTx& wtx, UniValue& entry)
     }
     entry.pushKV("bip125-replaceable", rbfStatus);
 
-    for (const std::pair<const std::string, std::string>& item : wtx.mapValue)
-        entry.pushKV(item.first, item.second);
+    for (const std::pair<const std::string, std::string>& item : wtx.mapValue) {
+        // Skip blinding data which isn't parseable
+        if (item.first != "blindingdata") {
+            entry.pushKV(item.first, item.second);
+        }
+    }
 }
 
 static std::string LabelFromValue(const UniValue& value)
