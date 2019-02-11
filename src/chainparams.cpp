@@ -533,9 +533,6 @@ class CCustomParams : public CRegTestParams {
         // No subsidy for custom chains by default
         consensus.genesis_subsidy = args.GetArg("-con_blocksubsidy", 0);
 
-        // Subsidy asset only matters when subsidy > 0
-        consensus.subsidy_asset = CAsset(uint256S(gArgs.GetArg("-subsidyasset", uint256().GetHex())));;
-
         // All non-zero coinbase outputs must go to this scriptPubKey
         std::vector<unsigned char> man_bytes = ParseHex(args.GetArg("-con_mandatorycoinbase", ""));
         consensus.mandatory_coinbase_destination = CScript(man_bytes.begin(), man_bytes.end()); // Blank script allows any coinbase destination
@@ -574,10 +571,22 @@ class CCustomParams : public CRegTestParams {
         std::vector<unsigned char> commit = CommitToArguments(consensus, strNetworkID);
         uint256 entropy;
         GenerateAssetEntropy(entropy,  COutPoint(uint256(commit), 0), parentGenesisBlockHash);
-        CalculateAsset(consensus.pegged_asset, entropy);
+
+        // Elements serialization uses derivation, bitcoin serialization uses 0x00
+        if (g_con_elementswitness) {
+            CalculateAsset(consensus.pegged_asset, entropy);
+        } else {
+            assert(consensus.pegged_asset == CAsset());
+        }
 
         consensus.parent_pegged_asset.SetHex(args.GetArg("-con_parent_pegged_asset", "0x00"));
         initial_reissuance_tokens = args.GetArg("-initialreissuancetokens", 0);
+
+        // Subsidy asset, like policyAsset, defaults to the pegged_asset
+        consensus.subsidy_asset = consensus.pegged_asset;
+        if (gArgs.IsArgSet("-subsidyasset")) {
+            consensus.subsidy_asset = CAsset(uint256S(gArgs.GetArg("-subsidyasset", "0x00")));
+        }
 
         // END ELEMENTS fields
         //
