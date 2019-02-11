@@ -727,9 +727,8 @@ static bool AcceptToMemoryPoolWorker(const CChainParams& chainparams, CTxMemPool
 
         int64_t nSigOpsCost = GetTransactionSigOpCost(tx, view, STANDARD_SCRIPT_VERIFY_FLAGS);
 
-        if (!HasValidFee(tx))
-            return state.DoS(0, false, REJECT_INVALID, "bad-fees");
-        CAmount nFees = GetFeeMap(tx)[policyAsset];
+        // We only consider policyAsset
+        CAmount nFees = fee_map[policyAsset];
 
         // nModifiedFees includes any fee deltas from PrioritiseTransaction
         CAmount nModifiedFees = nFees;
