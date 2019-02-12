@@ -933,6 +933,8 @@ UniValue SignTransaction(CMutableTransaction& mtx, const UniValue& prevTxsUnival
         UpdateTransaction(mtx, i, sigdata);
 
         // amount must be specified for valid segwit signature
+        // TODO: CA Signing requires serialized CConfidentialValue for signature hash, provide it
+        // as "amountcommitment"
         if (amount.IsExplicit() && amount.GetAmount() == MAX_MONEY && !mtx.witness.vtxinwit[i].scriptWitness.IsNull()) {
             throw JSONRPCError(RPC_TYPE_ERROR, strprintf("Missing amount for %s", coin.out.ToString()));
         }
