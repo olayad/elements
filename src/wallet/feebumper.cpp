@@ -116,7 +116,8 @@ Result CreateTransaction(const CWallet* wallet, const uint256& txid, const CCoin
     }
 
     // calculate the old fee and fee-rate
-    old_fee = wtx.GetDebit(ISMINE_SPENDABLE) - GetFeeMap(*wtx.tx)[::policyAsset];
+    old_fee = wtx.GetDebit(ISMINE_SPENDABLE) - wtx.tx->GetValueOutMap()[::policyAsset];
+    if (g_con_elementswitness) old_fee = GetFeeMap(*wtx.tx)[::policyAsset];
     CFeeRate nOldFeeRate(old_fee, txSize);
     CFeeRate nNewFeeRate;
     // The wallet uses a conservative WALLET_INCREMENTAL_RELAY_FEE value to
@@ -187,6 +188,7 @@ Result CreateTransaction(const CWallet* wallet, const uint256& txid, const CCoin
     assert(nDelta > 0);
     mtx = CMutableTransaction{*wtx.tx};
     CTxOut* poutput = &(mtx.vout[nOutput]);
+    // TODO CA: Decrypt output amount using wallet
     if (!poutput->nValue.IsExplicit() || poutput->nValue.GetAmount() < nDelta) {
         errors.push_back("Change output is too small to bump the fee");
         return Result::WALLET_ERROR;
