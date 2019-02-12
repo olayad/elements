@@ -1852,28 +1852,32 @@ static UniValue getblockstats(const JSONRPCRequest& request)
     for (const auto& tx : block.vtx) {
         outputs += tx->vout.size();
 
-        if (loop_outputs) {
-            for (const CTxOut& out : tx->vout) {
-                utxo_size_inc += GetSerializeSize(out, SER_NETWORK, PROTOCOL_VERSION) + PER_UTXO_OVERHEAD;
+        CAmount tx_total_out = 0;
+
+        // ELEMENTS:
+        CAmount elements_txfee = 0;
+        if (g_con_elementswitness) {
+            if (loop_outputs) {
+                for (const CTxOut& out : tx->vout) {
+                    if (out.IsFee() && out.nAsset.GetAsset() == asset) {
+                        elements_txfee += out.nValue.GetAmount();
+                    }
+                    if (out.nValue.IsExplicit() && out.nAsset.IsExplicit() && out.nAsset.GetAsset() == asset) {
+                        tx_total_out += out.nValue.GetAmount();
+                    }
+                }
+            }
+        } else {
+            if (loop_outputs) {
+                for (const CTxOut& out : tx->vout) {
+                    tx_total_out += out.nValue.GetAmount();
+                    utxo_size_inc += GetSerializeSize(out, SER_NETWORK, PROTOCOL_VERSION) + PER_UTXO_OVERHEAD;
+                }
             }
         }
 
         if (tx->IsCoinBase()) {
             continue;
-        }
-
-        // ELEMENTS:
-        CAmount txfee = 0;
-        CAmount tx_total_out = 0;
-        if (loop_outputs) {
-            for (const CTxOut& out : tx->vout) {
-                if (out.IsFee() && out.nAsset.GetAsset() == asset) {
-                    txfee += out.nValue.GetAmount();
-                }
-                if (out.nValue.IsExplicit() && out.nAsset.IsExplicit() && out.nAsset.GetAsset() == asset) {
-                    tx_total_out += out.nValue.GetAmount();
-                }
-            }
         }
 
         inputs += tx->vin.size(); // Don't count coinbase's fake input
@@ -1908,6 +1912,7 @@ static UniValue getblockstats(const JSONRPCRequest& request)
             if (!g_txindex) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "One or more of the selected stats requires -txindex enabled");
             }
+            CAmount tx_total_in = 0; // Only needed for bitcoin serialization
             for (const CTxIn& in : tx->vin) {
                 if (in.m_is_pegin) {
                     continue;
@@ -1920,9 +1925,11 @@ static UniValue getblockstats(const JSONRPCRequest& request)
                 }
 
                 CTxOut prevoutput = tx_in->vout[in.prevout.n];
+                tx_total_in += g_con_elementswitness ? 0 : prevoutput.nValue.GetAmount();
                 utxo_size_inc -= GetSerializeSize(prevoutput, SER_NETWORK, PROTOCOL_VERSION) + PER_UTXO_OVERHEAD;
             }
 
+            CAmount txfee = g_con_elementswitness ? elements_txfee : (tx_total_in - tx_total_out);
             assert(MoneyRange(txfee));
             if (do_medianfee) {
                 fee_array.push_back(txfee);
