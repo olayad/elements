@@ -29,16 +29,14 @@ class CCheck
  {
  protected:
      ScriptError error;
-     bool fAmountError;
 
  public:
-     CCheck() : error(SCRIPT_ERR_UNKNOWN_ERROR), fAmountError(false) {}
+     CCheck() : error(SCRIPT_ERR_UNKNOWN_ERROR) {}
      virtual ~CCheck() {}
 
      virtual bool operator()() = 0;
 
      ScriptError GetScriptError() const { return error; }
-     bool IsAmountError() const { return fAmountError; }
 };
 
 /** Closure representing one output range check. */

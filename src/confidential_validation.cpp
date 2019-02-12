@@ -63,7 +63,6 @@ bool CRangeCheck::operator()() {
 
 bool CBalanceCheck::operator()() {
     if (!secp256k1_pedersen_verify_tally(secp256k1_ctx_verify_amounts, vpCommitsIn.data(), vpCommitsIn.size(), vpCommitsOut.data(), vpCommitsOut.size())) {
-        fAmountError = true;
         error = SCRIPT_ERR_PEDERSEN_TALLY;
         return false;
     }
