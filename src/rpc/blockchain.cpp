@@ -2159,6 +2159,7 @@ UniValue scantxoutset(const JSONRPCRequest& request)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Scan already in progress, use action \"abort\" or \"status\"");
         }
         std::set<CScript> needles;
+        CAmount total_in = 0;
 
         // loop through the scan objects
         for (const UniValue& scanobject : request.params[1].get_array().getValues()) {
@@ -2212,36 +2213,57 @@ UniValue scantxoutset(const JSONRPCRequest& request)
         result.pushKV("success", res);
         result.pushKV("searched_items", count);
 
-        CAmount total_in_explicit_parent = 0;
-        for (const auto& it : coins) {
-            const COutPoint& outpoint = it.first;
-            const Coin& coin = it.second;
-            const CTxOut& txo = coin.out;
-            input_txos.push_back(txo);
-            if (txo.nValue.IsExplicit() && txo.nAsset.IsExplicit() && txo.nAsset.GetAsset() == Params().GetConsensus().pegged_asset) {
-                total_in_explicit_parent += txo.nValue.GetAmount();
-            }
+		if (!g_con_elementswitness) {
+            for (const auto& it : coins) {
+                const COutPoint& outpoint = it.first;
+                const Coin& coin = it.second;
+                const CTxOut& txo = coin.out;
+                input_txos.push_back(txo);
+                total_in += txo.nValue.GetAmount();
 
-            UniValue unspent(UniValue::VOBJ);
-            unspent.pushKV("txid", outpoint.hash.GetHex());
-            unspent.pushKV("vout", (int32_t)outpoint.n);
-            unspent.pushKV("scriptPubKey", HexStr(txo.scriptPubKey.begin(), txo.scriptPubKey.end()));
-            if (txo.nValue.IsExplicit()) {
+                UniValue unspent(UniValue::VOBJ);
+                unspent.pushKV("txid", outpoint.hash.GetHex());
+                unspent.pushKV("vout", (int32_t)outpoint.n);
+                unspent.pushKV("scriptPubKey", HexStr(txo.scriptPubKey.begin(), txo.scriptPubKey.end()));
                 unspent.pushKV("amount", ValueFromAmount(txo.nValue.GetAmount()));
-            } else {
-                unspent.pushKV("amountcommitment", HexStr(txo.nValue.vchCommitment));
-            }
-            if (txo.nAsset.IsExplicit()) {
-                unspent.pushKV("asset", txo.nAsset.GetAsset().GetHex());
-            } else {
-                unspent.pushKV("assetcommitment", HexStr(txo.nAsset.vchCommitment));
-            }
-            unspent.pushKV("height", (int32_t)coin.nHeight);
+                unspent.pushKV("height", (int32_t)coin.nHeight);
 
-            unspents.push_back(unspent);
+                unspents.push_back(unspent);
+            }
+            result.pushKV("unspents", unspents);
+            result.pushKV("total_amount", ValueFromAmount(total_in));
+        } else {
+            CAmount total_in_explicit_parent = 0;
+            for (const auto& it : coins) {
+                const COutPoint& outpoint = it.first;
+                const Coin& coin = it.second;
+                const CTxOut& txo = coin.out;
+                input_txos.push_back(txo);
+                if (txo.nValue.IsExplicit() && txo.nAsset.IsExplicit() && txo.nAsset.GetAsset() == Params().GetConsensus().pegged_asset) {
+                    total_in_explicit_parent += txo.nValue.GetAmount();
+                }
+
+                UniValue unspent(UniValue::VOBJ);
+                unspent.pushKV("txid", outpoint.hash.GetHex());
+                unspent.pushKV("vout", (int32_t)outpoint.n);
+                unspent.pushKV("scriptPubKey", HexStr(txo.scriptPubKey.begin(), txo.scriptPubKey.end()));
+                if (txo.nValue.IsExplicit()) {
+                    unspent.pushKV("amount", ValueFromAmount(txo.nValue.GetAmount()));
+                } else {
+                    unspent.pushKV("amountcommitment", HexStr(txo.nValue.vchCommitment));
+                }
+                if (txo.nAsset.IsExplicit()) {
+                    unspent.pushKV("asset", txo.nAsset.GetAsset().GetHex());
+                } else {
+                    unspent.pushKV("assetcommitment", HexStr(txo.nAsset.vchCommitment));
+                }
+                unspent.pushKV("height", (int32_t)coin.nHeight);
+
+                unspents.push_back(unspent);
+            }
+            result.pushKV("unspents", unspents);
+            result.pushKV("total_unblinded_bitcoin_amount", ValueFromAmount(total_in_explicit_parent));
         }
-        result.pushKV("unspents", unspents);
-        result.pushKV("total_unblinded_bitcoin_amount", ValueFromAmount(total_in_explicit_parent));
     } else {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid command");
     }
