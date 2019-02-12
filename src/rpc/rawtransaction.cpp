@@ -932,6 +932,11 @@ UniValue SignTransaction(CMutableTransaction& mtx, const UniValue& prevTxsUnival
 
         UpdateTransaction(mtx, i, sigdata);
 
+        // amount must be specified for valid segwit signature
+        if (amount.IsExplicit() && amount.GetAmount() == MAX_MONEY && !mtx.witness.vtxinwit[i].scriptWitness.IsNull()) {
+            throw JSONRPCError(RPC_TYPE_ERROR, strprintf("Missing amount for %s", coin.out.ToString()));
+        }
+
         ScriptError serror = SCRIPT_ERR_OK;
         if (!VerifyScript(txin.scriptSig, prevPubKey, &inWitness.scriptWitness, STANDARD_SCRIPT_VERIFY_FLAGS, TransactionSignatureChecker(&txConst, i, amount), &serror)) {
             if (serror == SCRIPT_ERR_INVALID_STACK_OPERATION) {
