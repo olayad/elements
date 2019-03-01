@@ -2660,7 +2660,7 @@ OutputType CWallet::TransactionChangeType(OutputType change_type, const std::vec
     return m_default_address_type;
 }
 
-bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CTransactionRef& tx, std::vector<std::unique_ptr<CReserveKey>>& reservekey, CAmount& nFeeRet, int& nChangePosInOut, std::string& strFailReason, const CCoinControl& coin_control, bool sign)
+bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CTransactionRef& tx, std::vector<std::unique_ptr<CReserveKey>>& reservekey, CAmount& nFeeRet, int& nChangePosInOut, std::string& strFailReason, const CCoinControl& coin_control, bool sign, const IssuanceDetails* issuance_details)
 {
     CAmountMap mapValue;
     int nChangePosRequest = nChangePosInOut;
@@ -2733,6 +2733,13 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CTransac
     int nBytes;
     {
         std::set<CInputCoin> setCoins;
+
+        // Various blinding/transaction data for computation/storage in wallet
+        std::vector<CAmount> o_amounts;
+        std::vector<CPubKey> o_pubkeys;
+        // Preserve order of selected inputs for surjection proofs
+        std::vector<CInputCoin> selected_coins;
+
         LOCK2(cs_main, cs_wallet);
         {
             std::vector<COutput> vAvailableCoins;
@@ -2777,6 +2784,12 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CTransac
             }
             CTxOut change_prototype_txout(CAsset(), 0, scriptChange);
             coin_selection_params.change_output_size = GetSerializeSize(change_prototype_txout);
+            // TODO CA: Activate when switching over to blinding by default
+            if (false && g_con_elementswitness) {
+                // Over-estimate probably. Tossing change is good for privacy anyways!
+                coin_selection_params.change_output_size += 33-9; // value commitment
+                coin_selection_params.change_output_size += 5134/2; // ghetto 32-bit est
+            }
 
             CFeeRate discard_rate = GetDiscardRate(*this, ::feeEstimator);
 
@@ -2795,6 +2808,10 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CTransac
             // Start with no fee and loop until there is enough fee
             while (true)
             {
+                // Clear out previous blinding/data info as needed
+                o_amounts.clear();
+                o_pubkeys.clear();
+
                 LogPrintf("attempt to form ok-fee tx...\n");
                 // We need to output the position of the policyAsset change output.
                 // So we keep track of the change position of all assets
@@ -2839,6 +2856,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CTransac
                     }
                     // Include the fee cost for outputs. Note this is only used for BnB right now
                     coin_selection_params.tx_noinputs_size += ::GetSerializeSize(txout, PROTOCOL_VERSION);
+                    // TODO CA: inflate this number for rangeproofs/commitments
 
                     if (recipient.asset == policyAsset && IsDust(txout, ::dustRelayFee))
                     {
@@ -2855,6 +2873,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CTransac
                         return false;
                     }
                     txNew.vout.push_back(txout);
+                    o_pubkeys.push_back(recipient.confidentiality_key);
                 }
 
                 // Choose coins to use
@@ -2917,6 +2936,8 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CTransac
 
                         std::vector<CTxOut>::iterator position = txNew.vout.begin()+vChangePosInOut[it->first];
                         txNew.vout.insert(position, newTxOut);
+                        CPubKey blind_pub = GetBlindingPubKey(scriptChange);
+                        o_pubkeys.insert(o_pubkeys.begin() + vChangePosInOut[it->first], blind_pub);
                     }
                 }
                 // Set the correct nChangePosInOut for output.  Should be policyAsset's position.
@@ -2924,7 +2945,7 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CTransac
                 if (itPos != vChangePosInOut.end()) {
                     nChangePosInOut = itPos->second;
                 } else {
-                    // no change inserted
+                    // no policy change inserted; others assets may have been
                     nChangePosInOut = -1;
                 }
 
@@ -2932,12 +2953,27 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CTransac
                 CTxOut fee(::policyAsset, nFeeRet, CScript());
                 assert(fee.IsFee());
                 txNew.vout.push_back(fee);
-                //TODO(rebase) 
-                //output_pubkeys.push_back(CPubKey());
+                o_pubkeys.push_back(CPubKey());
+
+                // Now that transaction is fully-formed minus witness/blind,
+                // generate blinding stuff for size estimation
+                std::vector<uint256> i_amount_blinds;
+                std::vector<uint256> i_asset_blinds;
+                std::vector<CAsset> i_assets;
+                std::vector<CAmount> i_amounts;
+                std::vector<uint256> o_amount_blinds;
+                std::vector<uint256> o_asset_blinds;
+                std::vector<CAsset> o_assets;
+
+                selected_coins = std::vector<CInputCoin>(setCoins.begin(), setCoins.end());
+                std::shuffle(selected_coins.begin(), selected_coins.end(), FastRandomContext());
+
+                // TODO: Blind outputs and issuances
 
                 // Dummy fill vin for maximum size estimation
                 //
-                for (const auto& coin : setCoins) {
+                // Elements: Shuffle here to preserve random ordering for surjection proofs
+                for (const auto& coin : selected_coins) {
                     txNew.vin.push_back(CTxIn(coin.outpoint,CScript()));
                 }
 
@@ -3036,8 +3072,6 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CTransac
 
         // Shuffle selected coins and fill in final vin
         txNew.vin.clear();
-        std::vector<CInputCoin> selected_coins(setCoins.begin(), setCoins.end());
-        std::shuffle(selected_coins.begin(), selected_coins.end(), FastRandomContext());
 
         // Note how the sequence number is set to non-maxint so that
         // the nLockTime set above actually works.
@@ -3074,6 +3108,14 @@ bool CWallet::CreateTransaction(const std::vector<CRecipient>& vecSend, CTransac
 
         // Return the constructed transaction data.
         tx = MakeTransactionRef(std::move(txNew));
+
+        // Store blinding data in wallet
+        if (sign) {
+            for (unsigned int i = 0; i< vAmounts.size(); i++) {
+                assert(!output_assets[i].IsNull());
+                wtxNew.SetBlindingData(i, vAmounts[i], output_pubkeys[i], output_blinds[i], output_assets[i], output_asset_blinds[i]);
+            }
+        }
 
         // Limit size
         if (GetTransactionWeight(*tx) > MAX_STANDARD_TX_WEIGHT)

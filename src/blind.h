@@ -14,6 +14,8 @@
 #include <secp256k1_rangeproof.h>
 #include <secp256k1_surjectionproof.h>
 
+#include <boost/optional.hpp>
+
 /*
  * blinding_key is used to create the nonce to rewind the rangeproof in conjunction with the nNonce commitment. In the case of a 0-length nNonce, the blinding key is directly used as the nonce.
  * Currently there is only a sidechannel message in the rangeproof so a valid rangeproof must
@@ -53,5 +55,16 @@ int BlindTransaction(std::vector<uint256 >& input_value_blinding_factors, const 
 void RawFillBlinds(CMutableTransaction& tx, std::vector<uint256>& output_value_blinds, std::vector<uint256>& output_asset_blinds, std::vector<CPubKey>& output_pubkeys);
 
 size_t GetNumIssuances(const CTransaction& tx);
+
+/*
+ * Contains details of the issuance being requested
+ */
+struct IssuanceDetails
+{
+    uint256 entropy;
+    boost::optional<CAsset> reissuance_asset; // Only used for reissuance
+    boost::optional<CAsset> reissuance_token; // Only used for reissuance
+	bool blind_issuance;
+};
 
 #endif //BITCOIN_WALLET_BLIND_H
