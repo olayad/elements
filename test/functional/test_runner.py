@@ -72,6 +72,7 @@ BASE_SCRIPTS = [
     'feature_default_asset_name.py',
     'feature_assetdir.py',
     'feature_initial_reissuance_token.py',
+    'rpc_tweakfedpeg.py',
     # Longest test should go first, to favor running tests in parallel
     'feature_fee_estimation.py',
     'wallet_hd.py',
